@@ -14,9 +14,19 @@
       document.body.appendChild(s);
     }
   }
+  function loadCss(href){
+    if(!document.querySelector('link[href="'+href+'"]')){
+      var l=document.createElement('link');
+      l.rel='stylesheet';
+      l.href=href;
+      document.head.appendChild(l);
+    }
+  }
   function loadExtraModules(){
     loadScript('assets/export-tools.js');
     loadScript('assets/update-tools.js');
+    loadCss('assets/client-card.css');
+    loadScript('assets/client-card.js');
   }
   function addTab(){
     if(document.querySelector('[data-tab="diagnostics"]')) return;
@@ -55,6 +65,7 @@
         out.push(row('PWA manifest', document.querySelector('link[rel="manifest"]') ? 'OK' : 'WARN', document.querySelector('link[rel="manifest"]') ? 'подключен' : 'не найден'));
         out.push(row('Export tools', window.LeaderExports ? 'OK' : 'WARN', window.LeaderExports ? 'модуль экспорта подключен' : 'модуль ещё загружается'));
         out.push(row('Update tools', window.LeaderUpdateTools ? 'OK' : 'WARN', window.LeaderUpdateTools ? 'модуль обновления подключен' : 'модуль ещё загружается'));
+        out.push(row('Client card', window.LeaderClientCard ? 'OK' : 'WARN', window.LeaderClientCard ? 'модуль карточки клиента подключен' : 'модуль ещё загружается'));
         var client=db();
         out.push(row('Supabase client', client ? 'OK' : 'ERR', client ? 'создан' : 'не создан'));
         if(client){
@@ -62,7 +73,7 @@
           var user=userRes && userRes.data ? userRes.data.user : null;
           out.push(row('Авторизация', user ? 'OK' : 'WARN', user ? user.email : 'вход не выполнен'));
           if(user){
-            var tables=['leader_orders','leader_clients','leader_leads','leader_catalog','leader_tasks','leader_user_profiles'];
+            var tables=['leader_orders','leader_clients','leader_leads','leader_catalog','leader_tasks','leader_user_profiles','leader_client_interactions'];
             for(var i=0;i<tables.length;i++){
               var r=await checkTable(tables[i]);
               out.push(row('Таблица '+tables[i], r.status, r.details));
