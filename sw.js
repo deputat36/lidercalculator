@@ -1,26 +1,42 @@
-const CACHE_NAME = 'leader-crm-v1';
+const CACHE_NAME = 'leader-crm-v2-2026-05-17';
 const ASSETS = [
   './',
   './index.html',
   './assets/leader-crm.css',
   './assets/order-card.css',
+  './assets/quick-tools.css',
   './assets/supabase-bridge.js',
   './assets/leader-crm.js',
   './assets/order-card.js',
   './assets/order-card-cloud.js',
+  './assets/pwa.js',
+  './assets/quick-tools.js',
+  './assets/health-check.js',
+  './assets/export-tools.js',
+  './assets/update-tools.js',
   './manifest.webmanifest'
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(ASSETS))
+      .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
   );
+});
+
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', event => {
@@ -28,6 +44,8 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.hostname.includes('supabase.co')) return;
+  if (url.hostname.includes('cdn.jsdelivr.net')) return;
+
   event.respondWith(
     fetch(req).then(res => {
       const copy = res.clone();
