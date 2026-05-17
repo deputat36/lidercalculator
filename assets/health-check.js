@@ -33,6 +33,8 @@
     loadScript('assets/lead-intake.js');
     loadCss('assets/workdesk.css');
     loadScript('assets/workdesk.js');
+    loadCss('assets/templates.css');
+    loadScript('assets/templates.js');
   }
   function addTab(){
     if(document.querySelector('[data-tab="diagnostics"]')) return;
@@ -75,6 +77,7 @@
         out.push(row('Lead card', window.LeaderLeadCard ? 'OK' : 'WARN', window.LeaderLeadCard ? 'модуль карточки заявки подключен' : 'модуль ещё загружается'));
         out.push(row('Manual lead intake', window.LeaderLeadIntake ? 'OK' : 'WARN', window.LeaderLeadIntake ? 'модуль ручного добавления заявок подключен' : 'модуль ещё загружается'));
         out.push(row('Workdesk', window.LeaderWorkdesk ? 'OK' : 'WARN', window.LeaderWorkdesk ? 'рабочий стол подключен' : 'модуль ещё загружается'));
+        out.push(row('Templates', window.LeaderTemplates ? 'OK' : 'WARN', window.LeaderTemplates ? 'модуль шаблонов подключен' : 'модуль ещё загружается'));
         var client=db();
         out.push(row('Supabase client', client ? 'OK' : 'ERR', client ? 'создан' : 'не создан'));
         if(client){
@@ -82,7 +85,7 @@
           var user=userRes && userRes.data ? userRes.data.user : null;
           out.push(row('Авторизация', user ? 'OK' : 'WARN', user ? user.email : 'вход не выполнен'));
           if(user){
-            var tables=['leader_orders','leader_clients','leader_leads','leader_catalog','leader_tasks','leader_user_profiles','leader_client_interactions','leader_lead_events'];
+            var tables=['leader_orders','leader_clients','leader_leads','leader_catalog','leader_tasks','leader_user_profiles','leader_client_interactions','leader_lead_events','leader_calculation_templates','leader_message_templates'];
             for(var i=0;i<tables.length;i++){
               var r=await checkTable(tables[i]);
               out.push(row('Таблица '+tables[i], r.status, r.details));
