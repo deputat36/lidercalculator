@@ -7,12 +7,16 @@
   }
   function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
   function db(){return window.db || null}
-  function loadExtraModules(){
-    if(!document.querySelector('script[src="assets/export-tools.js"]')){
+  function loadScript(src){
+    if(!document.querySelector('script[src="'+src+'"]')){
       var s=document.createElement('script');
-      s.src='assets/export-tools.js';
+      s.src=src;
       document.body.appendChild(s);
     }
+  }
+  function loadExtraModules(){
+    loadScript('assets/export-tools.js');
+    loadScript('assets/update-tools.js');
   }
   function addTab(){
     if(document.querySelector('[data-tab="diagnostics"]')) return;
@@ -50,6 +54,7 @@
         out.push(row('Service Worker', 'serviceWorker' in navigator ? 'OK' : 'WARN', 'serviceWorker' in navigator ? 'поддерживается' : 'не поддерживается браузером'));
         out.push(row('PWA manifest', document.querySelector('link[rel="manifest"]') ? 'OK' : 'WARN', document.querySelector('link[rel="manifest"]') ? 'подключен' : 'не найден'));
         out.push(row('Export tools', window.LeaderExports ? 'OK' : 'WARN', window.LeaderExports ? 'модуль экспорта подключен' : 'модуль ещё загружается'));
+        out.push(row('Update tools', window.LeaderUpdateTools ? 'OK' : 'WARN', window.LeaderUpdateTools ? 'модуль обновления подключен' : 'модуль ещё загружается'));
         var client=db();
         out.push(row('Supabase client', client ? 'OK' : 'ERR', client ? 'создан' : 'не создан'));
         if(client){
