@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>РА Лидер — CRM калькулятор</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-bridge.js"></script>
 <link rel="stylesheet" href="assets/leader-crm.css">
 <link rel="stylesheet" href="assets/order-card.css">
 </head>
@@ -33,6 +34,7 @@
         <button id="logout" class="hidden">Выйти</button>
         <button onclick="syncDown()" class="blue">Загрузить из облака</button>
         <button onclick="syncUp()">Отправить в облако</button>
+        <button onclick="LeaderCloudOrderCard && LeaderCloudOrderCard.syncAllOrderExtras()">Синхр. карточки</button>
       </div>
     </div>
     <div class="muted" style="margin-top:8px">Создание аккаунтов через сайт отключено. Новые пользователи создаются в Supabase → Authentication → Users, роли назначаются во вкладке «Пользователи».</div>
@@ -124,5 +126,6 @@
 <div id="toast" class="toast"></div>
 <script src="assets/leader-crm.js"></script>
 <script src="assets/order-card.js"></script>
+<script src="assets/order-card-cloud.js"></script>
 </body>
 </html>
