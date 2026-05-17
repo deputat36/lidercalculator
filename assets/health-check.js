@@ -31,6 +31,8 @@
     loadScript('assets/lead-card.js');
     loadCss('assets/lead-intake.css');
     loadScript('assets/lead-intake.js');
+    loadCss('assets/workdesk.css');
+    loadScript('assets/workdesk.js');
   }
   function addTab(){
     if(document.querySelector('[data-tab="diagnostics"]')) return;
@@ -72,6 +74,7 @@
         out.push(row('Client card', window.LeaderClientCard ? 'OK' : 'WARN', window.LeaderClientCard ? 'модуль карточки клиента подключен' : 'модуль ещё загружается'));
         out.push(row('Lead card', window.LeaderLeadCard ? 'OK' : 'WARN', window.LeaderLeadCard ? 'модуль карточки заявки подключен' : 'модуль ещё загружается'));
         out.push(row('Manual lead intake', window.LeaderLeadIntake ? 'OK' : 'WARN', window.LeaderLeadIntake ? 'модуль ручного добавления заявок подключен' : 'модуль ещё загружается'));
+        out.push(row('Workdesk', window.LeaderWorkdesk ? 'OK' : 'WARN', window.LeaderWorkdesk ? 'рабочий стол подключен' : 'модуль ещё загружается'));
         var client=db();
         out.push(row('Supabase client', client ? 'OK' : 'ERR', client ? 'создан' : 'не создан'));
         if(client){
