@@ -23,6 +23,7 @@
     }
   }
   function loadExtraModules(){
+    loadScript('assets/auth-repair.js');
     loadScript('assets/export-tools.js');
     loadScript('assets/update-tools.js');
     loadCss('assets/client-card.css');
@@ -77,6 +78,7 @@
         out.push(row('localStorage', window.localStorage ? 'OK' : 'ERR', window.localStorage ? 'доступен' : 'недоступен'));
         out.push(row('Service Worker', 'serviceWorker' in navigator ? 'OK' : 'WARN', 'serviceWorker' in navigator ? 'поддерживается' : 'не поддерживается браузером'));
         out.push(row('PWA manifest', document.querySelector('link[rel="manifest"]') ? 'OK' : 'WARN', document.querySelector('link[rel="manifest"]') ? 'подключен' : 'не найден'));
+        out.push(row('Auth repair', window.LeaderAuthRepair ? 'OK' : 'WARN', window.LeaderAuthRepair ? 'модуль сброса входа подключен' : 'модуль ещё загружается'));
         out.push(row('Export tools', window.LeaderExports ? 'OK' : 'WARN', window.LeaderExports ? 'модуль экспорта подключен' : 'модуль ещё загружается'));
         out.push(row('Update tools', window.LeaderUpdateTools ? 'OK' : 'WARN', window.LeaderUpdateTools ? 'модуль обновления подключен' : 'модуль ещё загружается'));
         out.push(row('Client card', window.LeaderClientCard ? 'OK' : 'WARN', window.LeaderClientCard ? 'модуль карточки клиента подключен' : 'модуль ещё загружается'));
