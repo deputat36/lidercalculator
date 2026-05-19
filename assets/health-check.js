@@ -26,6 +26,8 @@
     loadScript('assets/auth-repair.js');
     loadCss('assets/user-admin.css');
     loadScript('assets/user-admin.js');
+    loadCss('assets/role-guard.css');
+    loadScript('assets/role-guard.js');
     loadScript('assets/export-tools.js');
     loadScript('assets/update-tools.js');
     loadCss('assets/client-card.css');
@@ -82,6 +84,7 @@
         out.push(row('PWA manifest', document.querySelector('link[rel="manifest"]') ? 'OK' : 'WARN', document.querySelector('link[rel="manifest"]') ? 'подключен' : 'не найден'));
         out.push(row('Auth repair', window.LeaderAuthRepair ? 'OK' : 'WARN', window.LeaderAuthRepair ? 'модуль сброса входа подключен' : 'модуль ещё загружается'));
         out.push(row('User admin', window.LeaderUserAdmin ? 'OK' : 'WARN', window.LeaderUserAdmin ? 'модуль управления пользователями подключен' : 'модуль ещё загружается'));
+        out.push(row('Role guard', window.LeaderRoleGuard ? 'OK' : 'WARN', window.LeaderRoleGuard ? 'модуль ограничения ролей подключен' : 'модуль ещё загружается'));
         out.push(row('Export tools', window.LeaderExports ? 'OK' : 'WARN', window.LeaderExports ? 'модуль экспорта подключен' : 'модуль ещё загружается'));
         out.push(row('Update tools', window.LeaderUpdateTools ? 'OK' : 'WARN', window.LeaderUpdateTools ? 'модуль обновления подключен' : 'модуль ещё загружается'));
         out.push(row('Client card', window.LeaderClientCard ? 'OK' : 'WARN', window.LeaderClientCard ? 'модуль карточки клиента подключен' : 'модуль ещё загружается'));
@@ -99,7 +102,7 @@
           var user=userRes && userRes.data ? userRes.data.user : null;
           out.push(row('Авторизация', user ? 'OK' : 'WARN', user ? user.email : 'вход не выполнен'));
           if(user){
-            var tables=['leader_orders','leader_clients','leader_leads','leader_catalog','leader_tasks','leader_user_profiles','leader_user_activity','leader_client_interactions','leader_lead_events','leader_calculation_templates','leader_message_templates','leader_contractors','leader_production_jobs','leader_production_job_items','leader_production_events','leader_expenses','leader_finance_notes','leader_notification_preferences'];
+            var tables=['leader_orders','leader_clients','leader_leads','leader_catalog','leader_tasks','leader_user_profiles','leader_user_activity','leader_role_permissions','leader_client_interactions','leader_lead_events','leader_calculation_templates','leader_message_templates','leader_contractors','leader_production_jobs','leader_production_job_items','leader_production_events','leader_expenses','leader_finance_notes','leader_notification_preferences'];
             for(var i=0;i<tables.length;i++){
               var r=await checkTable(tables[i]);
               out.push(row('Таблица '+tables[i], r.status, r.details));
