@@ -28,6 +28,8 @@
     loadScript('assets/user-admin.js');
     loadCss('assets/role-guard.css');
     loadScript('assets/role-guard.js');
+    loadCss('assets/leads-fix.css');
+    loadScript('assets/leads-fix.js');
     loadScript('assets/export-tools.js');
     loadScript('assets/update-tools.js');
     loadCss('assets/client-card.css');
@@ -80,6 +82,13 @@
     if(res.error) return {status:'ERR', details:res.error.message};
     return {status:'OK', details:'доступ есть'};
   }
+  async function checkRpc(fn){
+    var client=db();
+    if(!client) return {status:'ERR', details:'Supabase client не создан'};
+    var res=await client.rpc(fn);
+    if(res.error) return {status:'ERR', details:res.error.message};
+    return {status:'OK', details:'доступ есть'};
+  }
   window.LeaderHealthCheck={
     async run(){
       var out=[];
@@ -94,6 +103,7 @@
         out.push(row('Auth repair', window.LeaderAuthRepair ? 'OK' : 'WARN', window.LeaderAuthRepair ? 'модуль сброса входа подключен' : 'модуль ещё загружается'));
         out.push(row('User admin', window.LeaderUserAdmin ? 'OK' : 'WARN', window.LeaderUserAdmin ? 'модуль управления пользователями подключен' : 'модуль ещё загружается'));
         out.push(row('Role guard', window.LeaderRoleGuard ? 'OK' : 'WARN', window.LeaderRoleGuard ? 'модуль ограничения ролей подключен' : 'модуль ещё загружается'));
+        out.push(row('Leads repair', window.LeaderLeadsFix ? 'OK' : 'WARN', window.LeaderLeadsFix ? 'аварийная загрузка заявок подключена' : 'модуль ещё загружается'));
         out.push(row('Export tools', window.LeaderExports ? 'OK' : 'WARN', window.LeaderExports ? 'модуль экспорта подключен' : 'модуль ещё загружается'));
         out.push(row('Update tools', window.LeaderUpdateTools ? 'OK' : 'WARN', window.LeaderUpdateTools ? 'модуль обновления подключен' : 'модуль ещё загружается'));
         out.push(row('Client card', window.LeaderClientCard ? 'OK' : 'WARN', window.LeaderClientCard ? 'модуль карточки клиента подключен' : 'модуль ещё загружается'));
@@ -119,6 +129,8 @@
             }
             var sv=await checkView('leader_production_safe_summary');
             out.push(row('View leader_production_safe_summary', sv.status, sv.details));
+            var lr=await checkRpc('leader_get_leads_for_crm');
+            out.push(row('RPC leader_get_leads_for_crm', lr.status, lr.details));
           }
         }
         body.innerHTML=out.join('');
