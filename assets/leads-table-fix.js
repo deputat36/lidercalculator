@@ -1,0 +1,14 @@
+// Direct renderer for website leads in CRM table.
+(function(){
+  function read(k,d){try{return JSON.parse(localStorage.getItem('lc_'+k))||d}catch(e){return d}}
+  function write(k,v){localStorage.setItem('lc_'+k,JSON.stringify(v))}
+  function db(){return window.db||null}
+  function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[m]})}
+  function fmt(v){try{return v?new Date(v).toLocaleString('ru-RU'):'—'}catch(e){return v||'—'}}
+  function toast(s){var e=document.getElementById('toast'); if(e){e.textContent=s;e.classList.add('show');setTimeout(function(){e.classList.remove('show')},2200)}else alert(s)}
+  async function get(){var c=db(); if(!c) throw new Error('Нет подключения Supabase'); var u=await c.auth.getUser(); if(!u.data.user) throw new Error('Сначала войдите'); var r=await c.rpc('leader_get_leads_for_crm'); if(r.error) throw new Error(r.error.message); write('leads',r.data||[]); return r.data||[]}
+  function table(list){var t=document.getElementById('leadsTbl'); if(!t) return; var b=t.querySelector('tbody'); if(!b) return; var f=document.getElementById('leadFilter'); var fv=f?f.value:'Все'; var a=(list||read('leads',[])).filter(function(x){return fv==='Все'||(x.status||'Новая')===fv}); b.innerHTML=''; if(!a.length){b.innerHTML='<tr><td colspan="7">Заявок нет</td></tr>';return} a.forEach(function(l,i){var tr=document.createElement('tr'); tr.innerHTML='<td>'+fmt(l.created_at)+'</td><td>'+esc(l.name)+'</td><td>'+esc(l.phone)+'</td><td>'+esc(l.service||l.source)+'</td><td>'+esc(l.message)+'</td><td>'+esc(l.status||'Новая')+'</td><td><button class="small">В расчёт</button></td>'; tr.querySelector('button').onclick=function(){if(window.applyInfo)window.applyInfo({name:l.name,phone:l.phone,source:l.source||'Сайт',message:l.message,comment:l.message}); var p=document.getElementById('projectName'); if(p)p.value='Заявка '+(l.name||l.phone||'с сайта'); var tab=document.querySelector('[data-tab="calc"]'); if(tab)tab.click()}; b.appendChild(tr)})}
+  function box(){var s=document.getElementById('leads'); if(!s||document.getElementById('leadSiteLoadBtn'))return; var r=s.querySelector('.card .row')||s.querySelector('.row')||s; var btn=document.createElement('button'); btn.id='leadSiteLoadBtn'; btn.className='primary'; btn.textContent='Загрузить заявки с сайта'; btn.onclick=async function(){try{var a=await get(); table(a); toast('Загружено заявок: '+a.length)}catch(e){alert(e.message)}}; r.appendChild(btn)}
+  window.LeaderLeadsTableFix={load:async function(){var a=await get(); table(a); return a},render:function(){table(read('leads',[]))}};
+  document.addEventListener('DOMContentLoaded',function(){setInterval(function(){box(); var f=document.getElementById('leadFilter'); if(f&&!f.dataset.leadSiteFix){f.dataset.leadSiteFix='1';f.addEventListener('change',function(){table(read('leads',[]))})}},1000)});
+})();
