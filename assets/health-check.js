@@ -42,6 +42,8 @@
     loadScript('assets/templates.js');
     loadCss('assets/production.css');
     loadScript('assets/production.js');
+    loadCss('assets/production-safe.css');
+    loadScript('assets/production-safe.js');
     loadCss('assets/finance.css');
     loadScript('assets/finance.js');
     loadCss('assets/notifications.css');
@@ -71,6 +73,13 @@
     if(res.error) return {status:'ERR', details:res.error.message};
     return {status:'OK', details:'доступ есть'};
   }
+  async function checkView(view){
+    var client=db();
+    if(!client) return {status:'ERR', details:'Supabase client не создан'};
+    var res=await client.from(view).select('*').limit(1);
+    if(res.error) return {status:'ERR', details:res.error.message};
+    return {status:'OK', details:'доступ есть'};
+  }
   window.LeaderHealthCheck={
     async run(){
       var out=[];
@@ -93,6 +102,7 @@
         out.push(row('Workdesk', window.LeaderWorkdesk ? 'OK' : 'WARN', window.LeaderWorkdesk ? 'рабочий стол подключен' : 'модуль ещё загружается'));
         out.push(row('Templates', window.LeaderTemplates ? 'OK' : 'WARN', window.LeaderTemplates ? 'модуль шаблонов подключен' : 'модуль ещё загружается'));
         out.push(row('Production', window.LeaderProduction ? 'OK' : 'WARN', window.LeaderProduction ? 'модуль производства подключен' : 'модуль ещё загружается'));
+        out.push(row('Safe production', window.LeaderProductionSafe ? 'OK' : 'WARN', window.LeaderProductionSafe ? 'безопасный режим производства подключен' : 'модуль ещё загружается'));
         out.push(row('Finance', window.LeaderFinance ? 'OK' : 'WARN', window.LeaderFinance ? 'модуль финансов подключен' : 'модуль ещё загружается'));
         out.push(row('Notifications', window.LeaderNotifications ? 'OK' : 'WARN', window.LeaderNotifications ? 'центр уведомлений подключен' : 'модуль ещё загружается'));
         var client=db();
@@ -107,6 +117,8 @@
               var r=await checkTable(tables[i]);
               out.push(row('Таблица '+tables[i], r.status, r.details));
             }
+            var sv=await checkView('leader_production_safe_summary');
+            out.push(row('View leader_production_safe_summary', sv.status, sv.details));
           }
         }
         body.innerHTML=out.join('');
