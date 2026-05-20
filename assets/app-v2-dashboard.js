@@ -1,4 +1,6 @@
 (function(){
+  function loadScript(src){if(!document.querySelector('script[src="'+src+'"]')){var s=document.createElement('script');s.src=src;document.body.appendChild(s)}}
+  loadScript('assets/app-v2-orders-pro.js');
   function el(id){return document.getElementById(id)}
   function money(v){return Math.round(Number(v||0)).toLocaleString('ru-RU')+' ₽'}
   function activeOrder(o){return ['Новый','КП отправлено','Согласовано','Передано подрядчику','В работе','Готов'].indexOf(o.status||'')>=0}
