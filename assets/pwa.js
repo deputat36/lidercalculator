@@ -1,4 +1,12 @@
 (function(){
+  function loadScript(src){
+    if(!document.querySelector('script[src="'+src+'"]')){
+      var s=document.createElement('script');
+      s.src=src;
+      document.body.appendChild(s);
+    }
+  }
+
   function showInstallButton(promptEvent){
     var host = document.querySelector('.top .row.no-print');
     if (!host || document.getElementById('installPwaBtn')) return;
@@ -23,5 +31,9 @@
   window.addEventListener('beforeinstallprompt', function(e){
     e.preventDefault();
     showInstallButton(e);
+  });
+
+  document.addEventListener('DOMContentLoaded', function(){
+    loadScript('assets/auth-status.js');
   });
 })();
