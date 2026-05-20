@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>РА Лидер — CRM v2</title>
+<meta name="theme-color" content="#111827">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-bridge.js"></script>
+<link rel="stylesheet" href="assets/app-v2.css">
+</head>
+<body>
+<div id="app" class="app">
+  <header class="topbar">
+    <div>
+      <h1>РА «Лидер» — рабочая CRM</h1>
+      <p>Заявки, расчёты, заказы, дизайн, услуги и производство в одном понятном процессе.</p>
+    </div>
+    <div class="auth-card">
+      <div id="authState" class="auth-state warn">Проверяю вход...</div>
+      <div id="authForm" class="auth-form">
+        <input id="loginEmail" type="email" placeholder="email">
+        <input id="loginPassword" type="password" placeholder="пароль">
+        <button id="loginBtn" class="primary">Войти</button>
+      </div>
+      <button id="logoutBtn" class="hidden">Выйти</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-page="dashboard">Рабочий стол</button>
+    <button class="tab" data-page="leads">Заявки</button>
+    <button class="tab" data-page="calc">Расчёт</button>
+    <button class="tab" data-page="orders">Заказы</button>
+    <button class="tab" data-page="design">Дизайн</button>
+    <button class="tab" data-page="clients">Клиенты</button>
+  </nav>
+
+  <main>
+    <section id="dashboard" class="page active">
+      <div class="grid stats">
+        <div class="card stat"><span>Новые заявки</span><b id="statNewLeads">0</b></div>
+        <div class="card stat"><span>В работе</span><b id="statWorkLeads">0</b></div>
+        <div class="card stat"><span>Ждём ответ</span><b id="statWaitingLeads">0</b></div>
+        <div class="card stat"><span>Создан заказ</span><b id="statConvertedLeads">0</b></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Что делать сейчас</h2>
+            <p>Основной сценарий: заявка → расчёт → согласование → заказ → дизайн/услуга/производство → оплата.</p>
+          </div>
+          <button id="dashReloadBtn">Обновить данные</button>
+        </div>
+        <div id="todayList" class="work-list"></div>
+      </div>
+    </section>
+
+    <section id="leads" class="page">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Заявки</h2>
+            <p>Здесь заявки с сайта и ручные обращения из MAX, ВК, звонков, Авито, карт и рекомендаций.</p>
+          </div>
+          <div class="actions">
+            <button id="newLeadBtn" class="primary">Создать заявку</button>
+            <button id="reloadLeadsBtn">Обновить</button>
+          </div>
+        </div>
+        <div class="filters">
+          <select id="leadStatusFilter">
+            <option value="active">Активные без спама</option>
+            <option value="Все">Все</option>
+            <option>Новая</option>
+            <option>В работе</option>
+            <option>Уточнение деталей</option>
+            <option>Расчёт подготовлен</option>
+            <option>КП отправлено</option>
+            <option>Ждём ответ</option>
+            <option>Нужно пересчитать</option>
+            <option>Согласовано</option>
+            <option>Создан заказ</option>
+            <option>Отказ</option>
+            <option>Не отвечает</option>
+            <option>Дорого</option>
+            <option>Передумал</option>
+          </select>
+          <select id="leadSourceFilter"><option value="Все">Все источники</option></select>
+          <input id="leadSearch" placeholder="Поиск по имени, телефону, услуге">
+        </div>
+        <div id="leadList" class="lead-list"></div>
+      </div>
+    </section>
+
+    <section id="calc" class="page">
+      <div id="activeLeadBox" class="notice hidden"></div>
+      <div class="grid calc-grid">
+        <div class="card">
+          <h2>Расчёт</h2>
+          <div class="form-grid">
+            <label>Клиент<input id="calcClientName"></label>
+            <label>Телефон<input id="calcClientPhone"></label>
+            <label>Источник<select id="calcSource"><option>MAX</option><option>ВК</option><option>Звонок</option><option>Авито</option><option>Сайт</option><option>Яндекс Карты</option><option>2ГИС</option><option>Рекомендация</option><option>Постоянный клиент</option><option>Другое</option></select></label>
+            <label>Тип заказа<select id="calcOrderType"><option>Смешанный</option><option>Изготовление</option><option>Услуга</option></select></label>
+            <label>Срок<input id="calcDeadline" type="date"></label>
+            <label>Макет<select id="calcLayoutStatus"><option>Макета нет</option><option>Нужен дизайн</option><option>Клиент прислал макет</option><option>Макет плохого качества</option><option>В работе у дизайнера</option><option>На согласовании</option><option>Согласован</option></select></label>
+            <label class="wide">Комментарий / задача<input id="calcComment"></label>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Добавить позицию</h2>
+          <div class="form-grid compact">
+            <label>Тип<select id="itemType"><option>Изготовление</option><option>Услуга</option><option>Дизайн</option><option>Монтаж</option><option>Доставка</option><option>Интернет-реклама</option><option>Карты и справочники</option><option>Контент</option><option>Материал</option><option>Другое</option></select></label>
+            <label>Название<input id="itemName" placeholder="Например: баннер 3×1 или логотип"></label>
+            <label>Ед.<select id="itemUnit"><option>шт</option><option>м²</option><option>м</option><option>проект</option><option>час</option><option>месяц</option><option>комплект</option></select></label>
+            <label>Кол-во<input id="itemQty" type="number" value="1" min="0" step="0.01"></label>
+            <label>Себестоимость за ед.<input id="itemCost" type="number" value="0" min="0" step="1"></label>
+            <label>Цена клиенту<input id="itemClient" type="number" value="0" min="0" step="1"></label>
+            <label class="wide">Комментарий<input id="itemComment"></label>
+          </div>
+          <button id="addItemBtn" class="primary">Добавить позицию</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Позиции расчёта</h2><button id="clearCalcBtn">Очистить</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Тип</th><th>Название</th><th>Ед.</th><th>Кол-во</th><th>Себестоимость</th><th>Клиенту</th><th>Комментарий</th><th></th></tr></thead><tbody id="calcRows"></tbody></table></div>
+        <div class="totals">
+          <div><span>Себестоимость</span><b id="totalCost">0 ₽</b></div>
+          <div><span>Клиенту</span><b id="totalClient">0 ₽</b></div>
+          <div><span>Маржа</span><b id="totalProfit">0 ₽</b></div>
+        </div>
+        <div class="actions right"><button id="quoteSentBtn">КП отправлено</button><button id="createOrderBtn" class="primary">Создать заказ</button></div>
+      </div>
+    </section>
+
+    <section id="orders" class="page"><div class="card"><div class="card-head"><div><h2>Заказы</h2><p>Заказ появляется после согласования расчёта. Здесь будет дальнейшая работа: дизайн, услуга, производство, оплата.</p></div><button id="reloadOrdersBtn">Обновить</button></div><div id="ordersList" class="work-list empty">Раздел будет подключён после очистки заказов.</div></div></section>
+    <section id="design" class="page"><div class="card"><h2>Дизайн-задачи</h2><p>Для дизайнера здесь должны быть только задачи по макетам, без телефона клиента, себестоимости и маржи.</p><div id="designList" class="work-list empty">Пока нет задач дизайна.</div></div></section>
+    <section id="clients" class="page"><div class="card"><h2>Клиенты</h2><p>Клиент создаётся из заявки или заказа. Этот раздел будет очищен после стабилизации заявок и заказов.</p><div id="clientsList" class="work-list empty">Раздел в подготовке.</div></div></section>
+  </main>
+</div>
+
+<div id="leadModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="card-head"><h2 id="leadModalTitle">Новая заявка</h2><button id="closeLeadModal">×</button></div>
+    <div class="form-grid">
+      <label>Имя клиента<input id="leadName"></label>
+      <label>Телефон<input id="leadPhone"></label>
+      <label>Источник<select id="leadSource"><option>MAX</option><option>ВК</option><option>Звонок</option><option>Авито</option><option>Сайт</option><option>Яндекс Карты</option><option>2ГИС</option><option>Рекомендация</option><option>Постоянный клиент</option><option>Другое</option></select></label>
+      <label>Услуга / задача<input id="leadService"></label>
+      <label>Бюджет, если известен<input id="leadBudget" type="number" min="0" step="1"></label>
+      <label>Город<input id="leadCity" value="Борисоглебск"></label>
+      <label class="wide">Комментарий<textarea id="leadMessage" rows="4"></textarea></label>
+    </div>
+    <div class="actions right"><button id="saveLeadBtn" class="primary">Сохранить заявку</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="assets/app-v2.js"></script>
+</body>
+</html>
