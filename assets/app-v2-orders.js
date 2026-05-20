@@ -24,14 +24,28 @@
     var box=el('ordersList');
     if(box){ box.className='work-list empty'; box.innerHTML=esc(text); }
   }
-  async function api(body){
+  async function ensureSession(){
     if(!window.db) throw new Error('Supabase не подключён');
     var s = await withTimeout(window.db.auth.getSession(),10000,'Не удалось проверить вход за 10 секунд');
     if(!s || !s.data || !s.data.session) throw new Error('Сначала войдите в CRM');
-    var r = await withTimeout(window.db.functions.invoke('leader-crm-leads',{body:body}),20000,'Supabase не ответил за 20 секунд');
-    if(r.error) throw new Error(r.error.message || 'Ошибка запроса');
+    return s.data.session;
+  }
+  async function loadOrdersDirect(){
+    await ensureSession();
+    var r = await withTimeout(
+      window.db.from('leader_orders').select('id,order_number,created_at,project_name,client_name,client_phone,status,payment_status,deadline,client_total,profit,balance,source,layout_status,production_status,data').order('created_at',{ascending:false}).limit(100),
+      15000,
+      'Прямой запрос заказов не ответил за 15 секунд'
+    );
+    if(r.error) throw new Error(r.error.message || 'Ошибка прямого запроса заказов');
+    return r.data || [];
+  }
+  async function loadOrdersViaFunction(){
+    await ensureSession();
+    var r = await withTimeout(window.db.functions.invoke('leader-crm-leads',{body:{action:'list_orders'}}),15000,'Edge Function не ответила за 15 секунд');
+    if(r.error) throw new Error(r.error.message || 'Ошибка Edge Function');
     if(r.data && r.data.error) throw new Error(r.data.error + (r.data.details ? ': '+r.data.details : ''));
-    return r.data || {};
+    return (r.data && r.data.orders) || [];
   }
   function orderType(o){ return (o.data && o.data.order_type) ? o.data.order_type : '—'; }
   function renderOrders(list){
@@ -62,8 +76,13 @@
   async function loadOrders(silent){
     try{
       if(!silent) showOrdersMessage('Загружаю заказы...');
-      var data=await api({action:'list_orders'});
-      var list=data.orders || [];
+      var list=[];
+      try{
+        list = await loadOrdersDirect();
+      }catch(directError){
+        console.warn('Direct orders failed, trying Edge Function', directError);
+        list = await loadOrdersViaFunction();
+      }
       renderOrders(list);
       renderDesign(list);
       return list;
