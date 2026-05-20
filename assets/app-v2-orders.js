@@ -7,6 +7,7 @@
     }
   }
   loadScript('assets/app-v2-auth-fix.js');
+  loadScript('assets/app-v2-dashboard.js');
   function el(id){ return document.getElementById(id); }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]}); }
   function money(v){ return Math.round(Number(v || 0)).toLocaleString('ru-RU') + ' ₽'; }
@@ -23,6 +24,11 @@
   function showOrdersMessage(text){
     var box=el('ordersList');
     if(box){ box.className='work-list empty'; box.innerHTML=esc(text); }
+  }
+  function updateDash(list){
+    if(window.LeaderV2Dashboard&&window.LeaderV2Dashboard.updateOrders){
+      window.LeaderV2Dashboard.updateOrders(list||[]);
+    }
   }
   async function ensureSession(){
     if(!window.db) throw new Error('Supabase не подключён');
@@ -85,9 +91,11 @@
       }
       renderOrders(list);
       renderDesign(list);
+      updateDash(list);
       return list;
     }catch(e){
       showOrdersMessage('Не удалось загрузить заказы: '+e.message);
+      updateDash([]);
       if(!silent) alert(e.message);
       throw e;
     }
@@ -106,7 +114,7 @@
         setTimeout(function(){ loadOrders(true).catch(function(){}) },3500);
       });
     }
-    document.querySelectorAll('[data-page="orders"],[data-page="design"]').forEach(function(tab){
+    document.querySelectorAll('[data-page="orders"],[data-page="design"],[data-page="dashboard"]').forEach(function(tab){
       if(!tab.dataset.ordersTabBound){
         tab.dataset.ordersTabBound='1';
         tab.addEventListener('click',function(){ setTimeout(function(){ loadOrders(true).catch(function(){}) },250); });
