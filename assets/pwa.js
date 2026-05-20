@@ -75,6 +75,7 @@
   window.LeaderPWA={hardUpdate:hardUpdate,showUpdateButton:showUpdateButton};
 
   document.addEventListener('DOMContentLoaded', function(){
+    loadScript('assets/auth-fast.js');
     loadScript('assets/auth-status.js');
     showUpdateButton();
     setInterval(showUpdateButton,2500);
