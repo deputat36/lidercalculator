@@ -1,18 +1,14 @@
 (function(){
   function el(id){return document.getElementById(id)}
   function n(v){v=String(v||'').replace(',','.').replace(/\s+/g,'');var x=parseFloat(v);return isNaN(x)?0:x}
-  function rub(v){v=parseFloat(v||0)||0;return Math.round(v).toLocaleString('ru-RU')+' ₽'}
   function toast(s){var t=el('toast'); if(!t){console.log(s);return} t.textContent=s;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2200)}
   function setVal(id,v){if(el(id)){el(id).value=v;el(id).dispatchEvent(new Event('input',{bubbles:true}))}}
-  function clickText(txt){var buttons=[].slice.call(document.querySelectorAll('button'));var b=buttons.find(function(x){return (x.textContent||'').trim()===txt}); if(b) b.click();}
-  function currentTotals(){
-    return {
-      total: el('sumTotal') ? el('sumTotal').textContent : '0 ₽',
-      cost: el('sumCost') ? el('sumCost').textContent : '0 ₽',
-      debt: el('sumDebt') ? el('sumDebt').textContent : '0 ₽',
-      profit: el('sumProfit') ? el('sumProfit').textContent : '0 ₽'
-    };
-  }
+  function currentTotals(){return{total:el('sumTotal')?el('sumTotal').textContent:'0 ₽',cost:el('sumCost')?el('sumCost').textContent:'0 ₽',debt:el('sumDebt')?el('sumDebt').textContent:'0 ₽',profit:el('sumProfit')?el('sumProfit').textContent:'0 ₽'}}
+  function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[m]})}
+  function fmt(v){try{return v?new Date(v).toLocaleString('ru-RU'):'—'}catch(e){return v||'—'}}
+  function read(k,d){try{return JSON.parse(localStorage.getItem('lc_'+k))||d}catch(e){return d}}
+  function write(k,v){localStorage.setItem('lc_'+k,JSON.stringify(v))}
+
   function addQuickBox(){
     var calc=document.getElementById('calc'); if(!calc || document.getElementById('quickToolsBox')) return;
     var box=document.createElement('div'); box.id='quickToolsBox'; box.className='qt-card no-print';
@@ -29,16 +25,8 @@
     if(q>0) setVal('qty', q);
     toast('Размер подставлен');
   }
-  function selectItemByText(text){
-    var sel=el('itm'); if(!sel) return false;
-    for(var i=0;i<sel.options.length;i++) if((sel.options[i].text||'').toLowerCase().includes(text.toLowerCase())){sel.selectedIndex=i;sel.dispatchEvent(new Event('change',{bubbles:true}));return true}
-    return false;
-  }
-  function selectCategoryContaining(text){
-    var sel=el('cat'); if(!sel) return false;
-    for(var i=0;i<sel.options.length;i++) if((sel.options[i].text||'').toLowerCase().includes(text.toLowerCase())){sel.selectedIndex=i;sel.dispatchEvent(new Event('change',{bubbles:true}));return true}
-    return false;
-  }
+  function selectItemByText(text){var sel=el('itm'); if(!sel) return false; for(var i=0;i<sel.options.length;i++) if((sel.options[i].text||'').toLowerCase().includes(text.toLowerCase())){sel.selectedIndex=i;sel.dispatchEvent(new Event('change',{bubbles:true}));return true} return false}
+  function selectCategoryContaining(text){var sel=el('cat'); if(!sel) return false; for(var i=0;i<sel.options.length;i++) if((sel.options[i].text||'').toLowerCase().includes(text.toLowerCase())){sel.selectedIndex=i;sel.dispatchEvent(new Event('change',{bubbles:true}));return true} return false}
   function applyTemplate(name){
     if(name==='banner2x1'){selectCategoryContaining('Широкоформат');selectItemByText('Баннер');setVal('w','2');setVal('h','1');setVal('qty','1'); if(el('hem'))el('hem').checked=true;if(el('luv'))el('luv').checked=true;toast('Шаблон баннера 2×1 подставлен');return}
     if(name==='banner3x1'){selectCategoryContaining('Широкоформат');selectItemByText('Баннер');setVal('w','3');setVal('h','1');setVal('qty','1'); if(el('hem'))el('hem').checked=true;if(el('luv'))el('luv').checked=true;toast('Шаблон баннера 3×1 подставлен');return}
@@ -54,7 +42,48 @@
     p.innerHTML='<div><div class="qt-muted">Итого клиенту</div><b id="qtTotal">0 ₽</b><div class="qt-muted">Маржа: <span id="qtProfit">0 ₽</span> • Остаток: <span id="qtDebt">0 ₽</span></div></div><div class="qt-actions"><button onclick="printDoc(\'client\')">КП</button><button onclick="copyMax()">MAX</button><button onclick="saveProject()">Сохранить</button><button onclick="createOrder()">Заказ</button></div>';
     calc.appendChild(p);
   }
-  function updateBottom(){var t=currentTotals(); if(el('qtTotal')) el('qtTotal').textContent=t.total; if(el('qtProfit')) el('qtProfit').textContent=t.profit; if(el('qtDebt')) el('qtDebt').textContent=t.debt;}
+  function updateBottom(){var t=currentTotals(); if(el('qtTotal')) el('qtTotal').textContent=t.total; if(el('qtProfit')) el('qtProfit').textContent=t.profit; if(el('qtDebt')) el('qtDebt').textContent=t.debt}
   function wrapRenderRows(){var old=window.renderRows;if(typeof old==='function'&&!old._qt){var f=function(){old();updateBottom()};f._qt=true;window.renderRows=f}}
-  document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){addQuickBox();addBottomPanel();wrapRenderRows();updateBottom()},500);setInterval(updateBottom,1200)});
+
+  async function loadSiteLeads(){
+    if(!window.db) throw new Error('Нет подключения Supabase');
+    var u=await window.db.auth.getUser();
+    if(!u.data.user) throw new Error('Сначала войдите в CRM');
+    var r=await window.db.functions.invoke('leader-crm-leads',{body:{mode:'list'}});
+    if(r.error) throw new Error(r.error.message || 'Ошибка загрузки заявок');
+    var list=(r.data&&r.data.leads)||[];
+    write('leads',list);
+    drawSiteLeads(list);
+    return list;
+  }
+  function drawSiteLeads(list){
+    list=list||read('leads',[]);
+    var tbl=el('leadsTbl'); if(!tbl) return;
+    var tb=tbl.querySelector('tbody'); if(!tb) return;
+    var f=el('leadFilter'); var fv=f?f.value:'Все';
+    var arr=list.filter(function(x){return fv==='Все'||(x.status||'Новая')===fv});
+    tb.innerHTML='';
+    if(!arr.length){tb.innerHTML='<tr><td colspan="7">Заявок нет</td></tr>';return}
+    arr.forEach(function(l){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+fmt(l.created_at)+'</td><td>'+esc(l.name)+'</td><td>'+esc(l.phone)+'</td><td>'+esc(l.service||l.source)+'</td><td>'+esc(l.message)+'</td><td>'+esc(l.status||'Новая')+'</td><td><button class="small">В расчёт</button></td>';
+      tr.querySelector('button').onclick=function(){if(window.applyInfo)window.applyInfo({name:l.name,phone:l.phone,source:l.source||'Сайт',message:l.message,comment:l.message});var p=el('projectName');if(p)p.value='Заявка '+(l.name||l.phone||'с сайта');var tab=document.querySelector('[data-tab="calc"]');if(tab)tab.click()};
+      tb.appendChild(tr);
+    });
+  }
+  function addLeadButton(){
+    var sec=el('leads'); if(!sec || el('qtSiteLeadsBtn')) return;
+    var row=sec.querySelector('.card .row .row') || sec.querySelector('.card .row') || sec;
+    var b=document.createElement('button');
+    b.id='qtSiteLeadsBtn';
+    b.className='primary';
+    b.textContent='Загрузить заявки с сайта';
+    b.onclick=async function(){try{var list=await loadSiteLeads();toast('Загружено заявок: '+list.length)}catch(e){alert(e.message)}};
+    row.appendChild(b);
+  }
+  window.LeaderSiteLeads={load:loadSiteLeads,render:function(){drawSiteLeads(read('leads',[]))}};
+  document.addEventListener('DOMContentLoaded',function(){
+    setTimeout(function(){addQuickBox();addBottomPanel();wrapRenderRows();updateBottom();addLeadButton()},500);
+    setInterval(function(){updateBottom();addLeadButton();var f=el('leadFilter');if(f&&!f.dataset.qtLeads){f.dataset.qtLeads='1';f.addEventListener('change',function(){drawSiteLeads(read('leads',[]))})}},1200);
+  });
 })();
