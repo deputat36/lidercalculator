@@ -1,0 +1,371 @@
+const SUPABASE_URL = 'https://ofewxuqfjhamgerwzull.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_ZiX8_Mnf0dY6S__tKO2A4A_uD94G2cs';
+const db = window.db || supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+window.db = db;
+
+const state = {
+  user: null,
+  profile: null,
+  leads: [],
+  activeLead: null,
+  rows: [],
+};
+
+const statuses = ['Новая','В работе','Уточнение деталей','Расчёт подготовлен','КП отправлено','Ждём ответ','Нужно пересчитать','Согласовано','Создан заказ','Отказ','Не отвечает','Дорого','Передумал'];
+const sources = ['MAX','ВК','Звонок','Авито','Сайт','Яндекс Карты','2ГИС','Рекомендация','Постоянный клиент','Другое'];
+
+function $(id){ return document.getElementById(id); }
+function money(v){ return Math.round(Number(v || 0)).toLocaleString('ru-RU') + ' ₽'; }
+function esc(s){ return String(s ?? '').replace(/[&<>\"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m])); }
+function toast(text){ const t=$('toast'); t.textContent=text; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400); }
+function dt(v){ try { return v ? new Date(v).toLocaleString('ru-RU') : '—'; } catch(e){ return v || '—'; } }
+function val(id){ return $(id)?.value?.trim() || ''; }
+function num(id){ return Number($(id)?.value || 0) || 0; }
+
+function setAuth(text, ok=false){
+  const e = $('authState');
+  e.textContent = text;
+  e.className = 'auth-state ' + (ok ? 'good' : 'warn');
+}
+
+async function getProfile(user){
+  const { data, error } = await db.from('leader_user_profiles').select('email,role,is_active,full_name').eq('user_id', user.id).maybeSingle();
+  if (error) return null;
+  return data;
+}
+
+async function checkAuth(){
+  const { data } = await db.auth.getSession();
+  const session = data.session;
+  if (!session?.user) {
+    state.user = null;
+    state.profile = null;
+    setAuth('Вход не выполнен. Введите email и пароль.');
+    $('authForm').classList.remove('hidden');
+    $('logoutBtn').classList.add('hidden');
+    return false;
+  }
+  state.user = session.user;
+  state.profile = await getProfile(session.user);
+  const role = state.profile?.role ? ' • роль: ' + state.profile.role : '';
+  setAuth('Вход выполнен: ' + session.user.email + role, true);
+  $('authForm').classList.add('hidden');
+  $('logoutBtn').classList.remove('hidden');
+  return true;
+}
+
+async function login(){
+  const email = val('loginEmail');
+  const password = val('loginPassword');
+  if (!email || !password) return alert('Введите email и пароль');
+  setAuth('Выполняю вход...');
+  const { error } = await db.auth.signInWithPassword({ email, password });
+  if (error) {
+    setAuth('Вход не выполнен: ' + error.message);
+    return alert(error.message);
+  }
+  await checkAuth();
+  await loadLeads();
+  toast('Вход выполнен');
+}
+
+async function logout(){
+  await db.auth.signOut();
+  await checkAuth();
+  toast('Вы вышли из CRM');
+}
+
+async function api(body){
+  const ok = await checkAuth();
+  if (!ok) throw new Error('Сначала войдите в CRM');
+  const { data, error } = await db.functions.invoke('leader-crm-leads', { body });
+  if (error) throw new Error(error.message || 'Ошибка запроса');
+  if (data?.error) throw new Error(data.error + (data.details ? ': ' + data.details : ''));
+  return data || {};
+}
+
+async function loadLeads(){
+  const data = await api({ action: 'list' });
+  state.leads = data.leads || [];
+  fillSourceFilter();
+  renderLeads();
+  renderDashboard();
+  return state.leads;
+}
+
+function fillSourceFilter(){
+  const sel = $('leadSourceFilter');
+  const old = sel.value || 'Все';
+  const set = new Set(['Все']);
+  state.leads.forEach(l => set.add(l.source || 'Не указан'));
+  sel.innerHTML = [...set].map(x => `<option>${esc(x)}</option>`).join('');
+  sel.value = [...set].includes(old) ? old : 'Все';
+}
+
+function statusBadge(status){
+  let cls = '';
+  if (['Создан заказ','Согласовано'].includes(status)) cls = 'good';
+  if (['Ждём ответ','КП отправлено','Уточнение деталей','Нужно пересчитать'].includes(status)) cls = 'warn';
+  if (['Отказ','Дорого','Передумал','Не отвечает'].includes(status)) cls = 'bad';
+  return `<span class="badge ${cls}">${esc(status || 'Новая')}</span>`;
+}
+
+function filteredLeads(){
+  const status = $('leadStatusFilter').value;
+  const source = $('leadSourceFilter').value;
+  const q = val('leadSearch').toLowerCase();
+  return state.leads.filter(l => {
+    const st = l.status || 'Новая';
+    if (status === 'active' && (st === 'Спам' || st === 'Создан заказ' || st === 'Отказ')) return false;
+    if (status !== 'active' && status !== 'Все' && st !== status) return false;
+    if (source !== 'Все' && (l.source || 'Не указан') !== source) return false;
+    if (q) {
+      const hay = [l.name,l.phone,l.service,l.message,l.source].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderLeads(){
+  const box = $('leadList');
+  const list = filteredLeads();
+  if (!list.length) {
+    box.innerHTML = '<div class="empty">Заявок по выбранным условиям нет.</div>';
+    return;
+  }
+  box.innerHTML = list.map(l => `
+    <article class="lead-card" data-id="${esc(l.id)}">
+      <div>
+        <div class="lead-title">${esc(l.name || 'Без имени')} ${statusBadge(l.status || 'Новая')}</div>
+        <div class="meta">${dt(l.created_at)} • ${esc(l.source || 'Источник не указан')} • ${esc(l.service || 'Услуга не указана')}</div>
+        <div class="meta">Телефон: ${esc(l.phone || '—')}${l.budget ? ' • Бюджет: ' + money(l.budget) : ''}</div>
+        <div class="lead-message">${esc(l.message || '')}</div>
+      </div>
+      <div class="lead-actions">
+        <select data-action="status">${statuses.map(s => `<option ${s===(l.status||'Новая')?'selected':''}>${s}</option>`).join('')}</select>
+        <button data-action="calc" class="primary">В расчёт</button>
+        <button data-action="client">Клиент</button>
+        <button data-action="spam">Спам</button>
+      </div>
+    </article>
+  `).join('');
+}
+
+async function updateLead(id, patch){
+  const data = await api({ action: 'update', id, ...patch });
+  const lead = data.lead;
+  if (lead) state.leads = state.leads.map(l => l.id === id ? { ...l, ...lead } : l);
+  renderLeads();
+  renderDashboard();
+}
+
+async function createManualLead(){
+  const data = await api({
+    action: 'create',
+    name: val('leadName'),
+    phone: val('leadPhone'),
+    source: val('leadSource'),
+    service: val('leadService'),
+    budget: val('leadBudget'),
+    city: val('leadCity'),
+    message: val('leadMessage'),
+  });
+  if (data.lead) state.leads = [data.lead, ...state.leads];
+  closeLeadModal();
+  renderLeads();
+  renderDashboard();
+  toast('Заявка создана');
+}
+
+async function ensureClient(lead){
+  const data = await api({ action: 'ensure_client', name: lead.name, phone: lead.phone, source: lead.source || 'CRM', comment: [lead.service, lead.message].filter(Boolean).join('\n') });
+  await updateLead(lead.id, { status: 'В работе' });
+  toast(data.existed ? 'Клиент уже был в базе' : 'Клиент создан');
+}
+
+function leadToCalc(lead){
+  state.activeLead = lead;
+  $('calcClientName').value = lead.name || '';
+  $('calcClientPhone').value = lead.phone || '';
+  $('calcSource').value = sources.includes(lead.source) ? lead.source : 'Другое';
+  $('calcComment').value = [lead.service, lead.message].filter(Boolean).join(' — ');
+  $('calcOrderType').value = guessOrderType(lead.service + ' ' + lead.message);
+  showActiveLead();
+  updateLead(lead.id, { status: 'В работе' }).catch(console.warn);
+  openPage('calc');
+}
+
+function guessOrderType(text){
+  const t = String(text || '').toLowerCase();
+  const production = ['баннер','наклей','таблич','плен','плён','печать','вывес','пвх','монтаж'];
+  const service = ['логотип','карточ','яндекс','2гис','текст','контент','ведение','соцсет','реклама','seo','фирмен'];
+  const hasP = production.some(x => t.includes(x));
+  const hasS = service.some(x => t.includes(x));
+  if (hasP && hasS) return 'Смешанный';
+  if (hasP) return 'Изготовление';
+  if (hasS) return 'Услуга';
+  return 'Смешанный';
+}
+
+function showActiveLead(){
+  const box = $('activeLeadBox');
+  if (!state.activeLead) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.classList.remove('hidden');
+  box.innerHTML = `<b>Расчёт связан с заявкой:</b> ${esc(state.activeLead.name || 'Без имени')} • ${esc(state.activeLead.service || 'Услуга не указана')} <button id="unlinkLeadBtn">Отвязать</button>`;
+  $('unlinkLeadBtn').onclick = () => { state.activeLead = null; showActiveLead(); };
+}
+
+function addItem(){
+  const row = {
+    id: Date.now() + Math.random(),
+    type: val('itemType'),
+    name: val('itemName'),
+    unit: val('itemUnit'),
+    qty: num('itemQty') || 1,
+    price: num('itemCost'),
+    client: num('itemClient'),
+    comment: val('itemComment'),
+  };
+  if (!row.name) return alert('Укажите название позиции');
+  state.rows.push(row);
+  ['itemName','itemCost','itemClient','itemComment'].forEach(id => $(id).value = id === 'itemCost' || id === 'itemClient' ? '0' : '');
+  $('itemQty').value = '1';
+  renderCalcRows();
+}
+
+function calcTotals(){
+  const cost = state.rows.reduce((a,r) => a + Number(r.price || 0) * Number(r.qty || 0), 0);
+  const total = state.rows.reduce((a,r) => a + Number(r.client || 0) * Number(r.qty || 0), 0);
+  return { cost, total, profit: total - cost, balance: total };
+}
+
+function renderCalcRows(){
+  const tb = $('calcRows');
+  tb.innerHTML = state.rows.map((r,i) => `
+    <tr>
+      <td>${esc(r.type)}</td><td>${esc(r.name)}</td><td>${esc(r.unit)}</td><td>${r.qty}</td>
+      <td>${money(Number(r.price||0) * Number(r.qty||0))}</td><td>${money(Number(r.client||0) * Number(r.qty||0))}</td>
+      <td>${esc(r.comment)}</td><td><button data-remove="${i}">×</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="8">Позиции ещё не добавлены.</td></tr>';
+  const t = calcTotals();
+  $('totalCost').textContent = money(t.cost);
+  $('totalClient').textContent = money(t.total);
+  $('totalProfit').textContent = money(t.profit);
+}
+
+async function markQuoteSent(){
+  if (!state.activeLead) return alert('Расчёт не связан с заявкой. Сначала выберите заявку и нажмите «В расчёт».');
+  await updateLead(state.activeLead.id, { status: 'КП отправлено', estimated_amount: calcTotals().total });
+  state.activeLead.status = 'КП отправлено';
+  toast('Статус заявки: КП отправлено');
+}
+
+async function createOrder(){
+  if (!state.rows.length) return alert('Добавьте хотя бы одну позицию расчёта');
+  const totals = calcTotals();
+  const data = await api({
+    action: 'create_order',
+    lead_id: state.activeLead?.id || null,
+    project_name: 'Заказ ' + (val('calcClientName') || val('calcClientPhone') || 'РА Лидер'),
+    client_name: val('calcClientName'),
+    client_phone: val('calcClientPhone'),
+    source: val('calcSource'),
+    order_type: val('calcOrderType'),
+    deadline: val('calcDeadline'),
+    layout_status: val('calcLayoutStatus'),
+    comment: val('calcComment'),
+    payment_status: 'Не оплачено',
+    rows: state.rows.map(r => ({ name: `[${r.type}] ${r.name}`, unit: r.unit, qty: r.qty, price: r.price, client_sum: Number(r.client||0)*Number(r.qty||0), contractor_sum: Number(r.price||0)*Number(r.qty||0), comment: r.comment })),
+    totals,
+  });
+  if (data.order) {
+    toast('Заказ создан');
+    state.rows = [];
+    renderCalcRows();
+    state.activeLead = null;
+    showActiveLead();
+    await loadLeads();
+    openPage('orders');
+  }
+}
+
+function renderDashboard(){
+  const active = state.leads.filter(l => l.status !== 'Спам');
+  $('statNewLeads').textContent = active.filter(l => (l.status || 'Новая') === 'Новая').length;
+  $('statWorkLeads').textContent = active.filter(l => (l.status || '') === 'В работе').length;
+  $('statWaitingLeads').textContent = active.filter(l => ['Ждём ответ','КП отправлено','Уточнение деталей'].includes(l.status || '')).length;
+  $('statConvertedLeads').textContent = active.filter(l => (l.status || '') === 'Создан заказ').length;
+  const list = active.filter(l => ['Новая','В работе','Уточнение деталей','Ждём ответ','КП отправлено'].includes(l.status || 'Новая')).slice(0,6);
+  $('todayList').innerHTML = list.map(l => `<div class="work-item"><b>${esc(l.name || 'Без имени')}</b> ${statusBadge(l.status || 'Новая')}<div class="meta">${esc(l.service || 'Услуга не указана')} • ${esc(l.phone || 'телефон не указан')}</div></div>`).join('') || '<div class="empty">Активных заявок нет.</div>';
+}
+
+function openLeadModal(){
+  ['leadName','leadPhone','leadService','leadBudget','leadMessage'].forEach(id => $(id).value = '');
+  $('leadSource').value = 'MAX';
+  $('leadCity').value = 'Борисоглебск';
+  $('leadModal').classList.remove('hidden');
+}
+function closeLeadModal(){ $('leadModal').classList.add('hidden'); }
+
+function openPage(id){
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === id));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.page === id));
+  if (id === 'dashboard') renderDashboard();
+  if (id === 'leads') renderLeads();
+  if (id === 'calc') renderCalcRows();
+}
+
+function bind(){
+  $('loginBtn').onclick = login;
+  $('logoutBtn').onclick = logout;
+  $('dashReloadBtn').onclick = () => loadLeads().then(() => toast('Данные обновлены')).catch(e => alert(e.message));
+  $('reloadLeadsBtn').onclick = () => loadLeads().then(() => toast('Заявки обновлены')).catch(e => alert(e.message));
+  $('newLeadBtn').onclick = openLeadModal;
+  $('closeLeadModal').onclick = closeLeadModal;
+  $('saveLeadBtn').onclick = () => createManualLead().catch(e => alert(e.message));
+  $('leadStatusFilter').onchange = renderLeads;
+  $('leadSourceFilter').onchange = renderLeads;
+  $('leadSearch').oninput = renderLeads;
+  $('addItemBtn').onclick = addItem;
+  $('clearCalcBtn').onclick = () => { if(confirm('Очистить расчёт?')) { state.rows=[]; renderCalcRows(); } };
+  $('quoteSentBtn').onclick = () => markQuoteSent().catch(e => alert(e.message));
+  $('createOrderBtn').onclick = () => createOrder().catch(e => alert(e.message));
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => openPage(t.dataset.page));
+  $('leadList').onclick = async (e) => {
+    const card = e.target.closest('.lead-card');
+    if (!card) return;
+    const lead = state.leads.find(l => l.id === card.dataset.id);
+    if (!lead) return;
+    const action = e.target.dataset.action;
+    try {
+      if (action === 'calc') leadToCalc(lead);
+      if (action === 'client') await ensureClient(lead);
+      if (action === 'spam') await updateLead(lead.id, { status: 'Спам' });
+    } catch(err) { alert(err.message); }
+  };
+  $('leadList').onchange = async (e) => {
+    const card = e.target.closest('.lead-card');
+    if (!card || e.target.dataset.action !== 'status') return;
+    try { await updateLead(card.dataset.id, { status: e.target.value }); toast('Статус обновлён'); } catch(err) { alert(err.message); }
+  };
+  $('calcRows').onclick = (e) => {
+    const i = e.target.dataset.remove;
+    if (i !== undefined) { state.rows.splice(Number(i),1); renderCalcRows(); }
+  };
+}
+
+async function boot(){
+  bind();
+  renderCalcRows();
+  const ok = await checkAuth();
+  if (ok) {
+    try { await loadLeads(); } catch(e) { toast('Не удалось загрузить заявки: ' + e.message); }
+  } else {
+    renderDashboard();
+    renderLeads();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', boot);
