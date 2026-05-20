@@ -8,6 +8,7 @@
   function fmt(v){try{return v?new Date(v).toLocaleString('ru-RU'):'—'}catch(e){return v||'—'}}
   function read(k,d){try{return JSON.parse(localStorage.getItem('lc_'+k))||d}catch(e){return d}}
   function write(k,v){localStorage.setItem('lc_'+k,JSON.stringify(v))}
+  function remove(k){localStorage.removeItem('lc_'+k)}
   function db(){return window.db}
 
   function addQuickBox(){
@@ -18,6 +19,7 @@
     document.getElementById('qtApplySize').onclick=applyQuickSize;
     box.querySelectorAll('[data-template]').forEach(function(btn){btn.onclick=function(){applyTemplate(btn.dataset.template)}});
   }
+
   function applyQuickSize(){
     var w=n(el('qtW').value), h=n(el('qtH').value), q=n(el('qtQty').value||1), u=el('qtUnit').value;
     if(u==='cm'){w=w/100;h=h/100}else if(u==='mm'){w=w/1000;h=h/1000}
@@ -37,6 +39,7 @@
     if(name==='design'){if(window.manual) window.manual('Дизайн');return}
     if(name==='mount'){if(window.manual) window.manual('Монтаж');return}
   }
+
   function addBottomPanel(){
     var calc=document.getElementById('calc'); if(!calc || document.getElementById('qtBottom')) return;
     var p=document.createElement('div');p.id='qtBottom';p.className='qt-bottom no-print';
@@ -68,6 +71,7 @@
     drawSiteLeads(list);
   }
   async function setLeadStatus(id,status){
+    if(!id) return;
     await invokeLead({action:'update',id:id,status:status});
     updateLocalLead(id,{status:status});
     toast('Статус заявки: '+status);
@@ -78,8 +82,16 @@
     await setLeadStatus(l.id,'В работе');
     toast((data.existed?'Клиент уже был в базе':'Клиент создан')+': '+(l.name||l.phone||''));
   }
+  function setActiveLead(l){
+    if(!l || !l.id) return;
+    write('active_lead_id',l.id);
+    write('active_lead_snapshot',l);
+    showActiveLeadNotice();
+  }
+  function clearActiveLead(){remove('active_lead_id');remove('active_lead_snapshot');showActiveLeadNotice()}
   function leadToCalc(i){
     var list=read('leads',[]), l=list[i]; if(!l) return;
+    setActiveLead(l);
     if(window.applyInfo) window.applyInfo({name:l.name,phone:l.phone,source:l.source||'Сайт',message:l.message,comment:l.message});
     setVal('clientName',l.name||'');
     setVal('clientPhone',l.phone||'');
@@ -89,6 +101,47 @@
     setLeadStatus(l.id,'В работе').catch(function(e){console.warn(e)});
     var tab=document.querySelector('[data-tab="calc"]'); if(tab) tab.click();
   }
+
+  function showActiveLeadNotice(){
+    var calc=el('calc'); if(!calc) return;
+    var old=el('activeLeadNotice');
+    var id=read('active_lead_id',null), lead=read('active_lead_snapshot',null);
+    if(!id){ if(old) old.remove(); return; }
+    if(!old){
+      old=document.createElement('div');
+      old.id='activeLeadNotice';
+      old.className='qt-card no-print';
+      old.style.borderColor='#bbf7d0';
+      old.style.background='#f0fdf4';
+      calc.insertBefore(old,calc.firstChild);
+    }
+    old.innerHTML='<div class="qt-title">Расчёт связан с заявкой</div><div>Клиент: <b>'+esc((lead&&lead.name)||'—')+'</b> • Телефон: <b>'+esc((lead&&lead.phone)||'—')+'</b> • Услуга: '+esc((lead&&lead.service)||'—')+'</div><div class="qt-row" style="margin-top:8px"><button class="primary" id="activeLeadCreateOrder">Создать заказ и закрыть заявку</button><button id="activeLeadClear">Отвязать заявку</button></div>';
+    var btn=el('activeLeadCreateOrder'); if(btn) btn.onclick=function(){ if(window.createOrder) window.createOrder(); };
+    var clear=el('activeLeadClear'); if(clear) clear.onclick=function(){ clearActiveLead(); toast('Заявка отвязана от расчёта'); };
+  }
+
+  function wrapCreateOrder(){
+    var old=window.createOrder;
+    if(typeof old!=='function' || old._leadLinked) return;
+    var wrapped=function(){
+      var activeId=read('active_lead_id',null);
+      var rows=read('rows',[]);
+      var result=old.apply(this,arguments);
+      if(activeId && rows && rows.length){
+        setLeadStatus(activeId,'Создан заказ').then(function(){
+          clearActiveLead();
+          toast('Заказ создан, заявка закрыта');
+        }).catch(function(e){
+          console.warn(e);
+          toast('Заказ создан, но статус заявки не обновился');
+        });
+      }
+      return result;
+    };
+    wrapped._leadLinked=true;
+    window.createOrder=wrapped;
+  }
+
   function drawSiteLeads(list){
     list=list||read('leads',[]);
     var tbl=el('leadsTbl'); if(!tbl) return;
@@ -120,9 +173,9 @@
     b.onclick=async function(){try{var list=await loadSiteLeads();toast('Загружено заявок: '+list.length)}catch(e){alert(e.message)}};
     row.appendChild(b);
   }
-  window.LeaderSiteLeads={load:loadSiteLeads,render:function(){drawSiteLeads(read('leads',[]))},setStatus:setLeadStatus,ensureClient:ensureClientFromLead,toCalc:leadToCalc};
+  window.LeaderSiteLeads={load:loadSiteLeads,render:function(){drawSiteLeads(read('leads',[]))},setStatus:setLeadStatus,ensureClient:ensureClientFromLead,toCalc:leadToCalc,clearActive:clearActiveLead};
   document.addEventListener('DOMContentLoaded',function(){
-    setTimeout(function(){addQuickBox();addBottomPanel();wrapRenderRows();updateBottom();addLeadButton()},500);
-    setInterval(function(){updateBottom();addLeadButton();var f=el('leadFilter');if(f&&!f.dataset.qtLeads){f.dataset.qtLeads='1';f.addEventListener('change',function(){drawSiteLeads(read('leads',[]))})}},1200);
+    setTimeout(function(){addQuickBox();addBottomPanel();wrapRenderRows();updateBottom();addLeadButton();wrapCreateOrder();showActiveLeadNotice()},500);
+    setInterval(function(){updateBottom();addLeadButton();wrapCreateOrder();showActiveLeadNotice();var f=el('leadFilter');if(f&&!f.dataset.qtLeads){f.dataset.qtLeads='1';f.addEventListener('change',function(){drawSiteLeads(read('leads',[]))})}},1200);
   });
 })();
