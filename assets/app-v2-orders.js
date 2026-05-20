@@ -1,9 +1,18 @@
 (function(){
+  function loadScript(src){
+    if(!document.querySelector('script[src="'+src+'"]')){
+      var s=document.createElement('script');
+      s.src=src;
+      document.body.appendChild(s);
+    }
+  }
+  loadScript('assets/app-v2-auth-fix.js');
   function el(id){ return document.getElementById(id); }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]}); }
   function money(v){ return Math.round(Number(v || 0)).toLocaleString('ru-RU') + ' ₽'; }
   function dt(v){ try { return v ? new Date(v).toLocaleString('ru-RU') : '—'; } catch(e){ return v || '—'; } }
   function toast(text){ var t=el('toast'); if(t){ t.textContent=text; t.classList.add('show'); setTimeout(function(){t.classList.remove('show')},2300); } else { alert(text); } }
+  function withTimeout(p,ms,label){return Promise.race([p,new Promise(function(_,reject){setTimeout(function(){reject(new Error(label||'Превышено время ожидания'))},ms)})])}
   function badge(text){
     var cls='';
     if(['Готов','Выдан','Оплачено','Согласован','Создан заказ'].indexOf(text)>=0) cls=' good';
@@ -17,9 +26,9 @@
   }
   async function api(body){
     if(!window.db) throw new Error('Supabase не подключён');
-    var s = await window.db.auth.getSession();
+    var s = await withTimeout(window.db.auth.getSession(),10000,'Не удалось проверить вход за 10 секунд');
     if(!s || !s.data || !s.data.session) throw new Error('Сначала войдите в CRM');
-    var r = await window.db.functions.invoke('leader-crm-leads',{body:body});
+    var r = await withTimeout(window.db.functions.invoke('leader-crm-leads',{body:body}),20000,'Supabase не ответил за 20 секунд');
     if(r.error) throw new Error(r.error.message || 'Ошибка запроса');
     if(r.data && r.data.error) throw new Error(r.data.error + (r.data.details ? ': '+r.data.details : ''));
     return r.data || {};
