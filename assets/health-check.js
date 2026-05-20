@@ -30,6 +30,7 @@
     loadScript('assets/role-guard.js');
     loadCss('assets/leads-fix.css');
     loadScript('assets/leads-fix.js');
+    loadScript('assets/leads-table-fix.js');
     loadScript('assets/export-tools.js');
     loadScript('assets/update-tools.js');
     loadCss('assets/client-card.css');
@@ -104,6 +105,7 @@
         out.push(row('User admin', window.LeaderUserAdmin ? 'OK' : 'WARN', window.LeaderUserAdmin ? 'модуль управления пользователями подключен' : 'модуль ещё загружается'));
         out.push(row('Role guard', window.LeaderRoleGuard ? 'OK' : 'WARN', window.LeaderRoleGuard ? 'модуль ограничения ролей подключен' : 'модуль ещё загружается'));
         out.push(row('Leads repair', window.LeaderLeadsFix ? 'OK' : 'WARN', window.LeaderLeadsFix ? 'аварийная загрузка заявок подключена' : 'модуль ещё загружается'));
+        out.push(row('Leads table fix', window.LeaderLeadsTableFix ? 'OK' : 'WARN', window.LeaderLeadsTableFix ? 'прямой вывод заявок подключен' : 'модуль ещё загружается'));
         out.push(row('Export tools', window.LeaderExports ? 'OK' : 'WARN', window.LeaderExports ? 'модуль экспорта подключен' : 'модуль ещё загружается'));
         out.push(row('Update tools', window.LeaderUpdateTools ? 'OK' : 'WARN', window.LeaderUpdateTools ? 'модуль обновления подключен' : 'модуль ещё загружается'));
         out.push(row('Client card', window.LeaderClientCard ? 'OK' : 'WARN', window.LeaderClientCard ? 'модуль карточки клиента подключен' : 'модуль ещё загружается'));
