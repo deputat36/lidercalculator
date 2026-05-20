@@ -8,6 +8,7 @@
   function fmt(v){try{return v?new Date(v).toLocaleString('ru-RU'):'—'}catch(e){return v||'—'}}
   function read(k,d){try{return JSON.parse(localStorage.getItem('lc_'+k))||d}catch(e){return d}}
   function write(k,v){localStorage.setItem('lc_'+k,JSON.stringify(v))}
+  function db(){return window.db}
 
   function addQuickBox(){
     var calc=document.getElementById('calc'); if(!calc || document.getElementById('quickToolsBox')) return;
@@ -45,16 +46,48 @@
   function updateBottom(){var t=currentTotals(); if(el('qtTotal')) el('qtTotal').textContent=t.total; if(el('qtProfit')) el('qtProfit').textContent=t.profit; if(el('qtDebt')) el('qtDebt').textContent=t.debt}
   function wrapRenderRows(){var old=window.renderRows;if(typeof old==='function'&&!old._qt){var f=function(){old();updateBottom()};f._qt=true;window.renderRows=f}}
 
-  async function loadSiteLeads(){
-    if(!window.db) throw new Error('Нет подключения Supabase');
-    var u=await window.db.auth.getUser();
+  async function invokeLead(body){
+    if(!db()) throw new Error('Нет подключения Supabase');
+    var u=await db().auth.getUser();
     if(!u.data.user) throw new Error('Сначала войдите в CRM');
-    var r=await window.db.functions.invoke('leader-crm-leads',{body:{mode:'list'}});
-    if(r.error) throw new Error(r.error.message || 'Ошибка загрузки заявок');
-    var list=(r.data&&r.data.leads)||[];
+    var r=await db().functions.invoke('leader-crm-leads',{body:body});
+    if(r.error) throw new Error(r.error.message || 'Ошибка запроса');
+    if(r.data && r.data.error) throw new Error(r.data.error);
+    return r.data || {};
+  }
+  async function loadSiteLeads(){
+    var data=await invokeLead({action:'list'});
+    var list=data.leads||[];
     write('leads',list);
     drawSiteLeads(list);
     return list;
+  }
+  function updateLocalLead(id, patch){
+    var list=read('leads',[]).map(function(x){return x.id===id?Object.assign({},x,patch):x});
+    write('leads',list);
+    drawSiteLeads(list);
+  }
+  async function setLeadStatus(id,status){
+    await invokeLead({action:'update',id:id,status:status});
+    updateLocalLead(id,{status:status});
+    toast('Статус заявки: '+status);
+  }
+  async function ensureClientFromLead(i){
+    var list=read('leads',[]), l=list[i]; if(!l) return;
+    var data=await invokeLead({action:'ensure_client',name:l.name,phone:l.phone,source:l.source||'Сайт',comment:(l.service||'')+'\n'+(l.message||'')});
+    await setLeadStatus(l.id,'В работе');
+    toast((data.existed?'Клиент уже был в базе':'Клиент создан')+': '+(l.name||l.phone||''));
+  }
+  function leadToCalc(i){
+    var list=read('leads',[]), l=list[i]; if(!l) return;
+    if(window.applyInfo) window.applyInfo({name:l.name,phone:l.phone,source:l.source||'Сайт',message:l.message,comment:l.message});
+    setVal('clientName',l.name||'');
+    setVal('clientPhone',l.phone||'');
+    if(el('source')) el('source').value='Сайт';
+    setVal('orderComment',[(l.service||''),(l.message||'')].filter(Boolean).join(' — '));
+    var p=el('projectName'); if(p) p.value='Заявка '+(l.name||l.phone||'с сайта');
+    setLeadStatus(l.id,'В работе').catch(function(e){console.warn(e)});
+    var tab=document.querySelector('[data-tab="calc"]'); if(tab) tab.click();
   }
   function drawSiteLeads(list){
     list=list||read('leads',[]);
@@ -65,9 +98,15 @@
     tb.innerHTML='';
     if(!arr.length){tb.innerHTML='<tr><td colspan="7">Заявок нет</td></tr>';return}
     arr.forEach(function(l){
+      var i=list.findIndex(function(x){return x.id===l.id});
       var tr=document.createElement('tr');
-      tr.innerHTML='<td>'+fmt(l.created_at)+'</td><td>'+esc(l.name)+'</td><td>'+esc(l.phone)+'</td><td>'+esc(l.service||l.source)+'</td><td>'+esc(l.message)+'</td><td>'+esc(l.status||'Новая')+'</td><td><button class="small">В расчёт</button></td>';
-      tr.querySelector('button').onclick=function(){if(window.applyInfo)window.applyInfo({name:l.name,phone:l.phone,source:l.source||'Сайт',message:l.message,comment:l.message});var p=el('projectName');if(p)p.value='Заявка '+(l.name||l.phone||'с сайта');var tab=document.querySelector('[data-tab="calc"]');if(tab)tab.click()};
+      tr.innerHTML='<td>'+fmt(l.created_at)+'</td><td><b>'+esc(l.name||'—')+'</b></td><td>'+esc(l.phone)+'</td><td>'+esc(l.service||l.source)+'</td><td>'+esc(l.message)+'</td><td><select class="lead-status"><option>Новая</option><option>В работе</option><option>Создан заказ</option><option>Отказ</option><option>Спам</option></select></td><td><button class="small to-calc">В расчёт</button> <button class="small make-client">Клиент</button> <button class="small mark-order">Заказ</button> <button class="small mark-spam">Спам</button></td>';
+      var sel=tr.querySelector('.lead-status'); sel.value=l.status||'Новая';
+      sel.onchange=function(){setLeadStatus(l.id,sel.value).catch(function(e){alert(e.message)})};
+      tr.querySelector('.to-calc').onclick=function(){leadToCalc(i)};
+      tr.querySelector('.make-client').onclick=function(){ensureClientFromLead(i).catch(function(e){alert(e.message)})};
+      tr.querySelector('.mark-order').onclick=function(){setLeadStatus(l.id,'Создан заказ').catch(function(e){alert(e.message)})};
+      tr.querySelector('.mark-spam').onclick=function(){setLeadStatus(l.id,'Спам').catch(function(e){alert(e.message)})};
       tb.appendChild(tr);
     });
   }
@@ -81,7 +120,7 @@
     b.onclick=async function(){try{var list=await loadSiteLeads();toast('Загружено заявок: '+list.length)}catch(e){alert(e.message)}};
     row.appendChild(b);
   }
-  window.LeaderSiteLeads={load:loadSiteLeads,render:function(){drawSiteLeads(read('leads',[]))}};
+  window.LeaderSiteLeads={load:loadSiteLeads,render:function(){drawSiteLeads(read('leads',[]))},setStatus:setLeadStatus,ensureClient:ensureClientFromLead,toCalc:leadToCalc};
   document.addEventListener('DOMContentLoaded',function(){
     setTimeout(function(){addQuickBox();addBottomPanel();wrapRenderRows();updateBottom();addLeadButton()},500);
     setInterval(function(){updateBottom();addLeadButton();var f=el('leadFilter');if(f&&!f.dataset.qtLeads){f.dataset.qtLeads='1';f.addEventListener('change',function(){drawSiteLeads(read('leads',[]))})}},1200);
