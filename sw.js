@@ -1,4 +1,4 @@
-const CACHE_NAME = 'leader-crm-v2-2026-05-17';
+const CACHE_NAME = 'leader-crm-v3-2026-05-20-01';
 const ASSETS = [
   './',
   './index.html',
@@ -10,8 +10,13 @@ const ASSETS = [
   './assets/order-card.js',
   './assets/order-card-cloud.js',
   './assets/pwa.js',
+  './assets/auth-status.js',
+  './assets/auth-repair.js',
   './assets/quick-tools.js',
   './assets/health-check.js',
+  './assets/leads-fix.css',
+  './assets/leads-fix.js',
+  './assets/leads-table-fix.js',
   './assets/export-tools.js',
   './assets/update-tools.js',
   './manifest.webmanifest'
@@ -34,9 +39,7 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('fetch', event => {
@@ -47,7 +50,7 @@ self.addEventListener('fetch', event => {
   if (url.hostname.includes('cdn.jsdelivr.net')) return;
 
   event.respondWith(
-    fetch(req).then(res => {
+    fetch(req, { cache: 'no-store' }).then(res => {
       const copy = res.clone();
       caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
       return res;
