@@ -15,5 +15,7 @@ async function load(silent){var box=e('ordersList');if(box&&!silent){box.classNa
 async function upd(id,f,v){var p={action:'update',id:id};p[f]=v;await call(p);toast('Заказ обновлён');load(true).catch(function(){})}
 document.addEventListener('change',function(ev){var s=ev.target;if(!s.dataset||!s.dataset.f)return;var c=s.closest('[data-order]');if(!c)return;upd(c.dataset.order,s.dataset.f,s.value).catch(function(x){alert(x.message)})});
 function bind(){css();var btn=e('reloadOrdersBtn');if(btn){btn.onclick=function(){load(false).then(function(a){toast('Заказы обновлены: '+a.length)}).catch(function(x){alert(x.message)})}}document.querySelectorAll('[data-page="orders"],[data-page="dashboard"],[data-page="design"]').forEach(function(n){if(!n.dataset.pro){n.dataset.pro='1';n.addEventListener('click',function(){setTimeout(function(){load(true).catch(function(){})},300)})}})}
-window.LeaderV2Orders={load:load};document.addEventListener('DOMContentLoaded',function(){bind();setTimeout(function(){bind();load(true).catch(function(){})},1200)})
+function boot(){bind();setTimeout(function(){bind();load(true).catch(function(){})},800)}
+window.LeaderV2Orders={load:load,boot:boot};
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',boot)}else{boot()}
 })();
