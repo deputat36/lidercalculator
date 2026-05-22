@@ -3,7 +3,7 @@
   loadScript('assets/app-v2-orders-pro.js');
   loadScript('assets/app-v2-clients.js');
   loadScript('assets/app-v2-client-picker.js');
-  loadScript('assets/app-v2-design.js');
+  loadScript('assets/app-v2-design-direct.js');
   loadScript('assets/app-v2-order-card.js');
   function el(id){return document.getElementById(id)}
   function money(v){return Math.round(Number(v||0)).toLocaleString('ru-RU')+' ₽'}
