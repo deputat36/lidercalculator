@@ -5,6 +5,7 @@
   loadScript('assets/app-v2-client-picker.js');
   loadScript('assets/app-v2-design-direct.js');
   loadScript('assets/app-v2-order-card.js');
+  loadScript('assets/app-v2-order-flow.js');
   function el(id){return document.getElementById(id)}
   function money(v){return Math.round(Number(v||0)).toLocaleString('ru-RU')+' ₽'}
   function activeOrder(o){return ['Новый','КП отправлено','Согласовано','Передано подрядчику','В работе','Готов'].indexOf(o.status||'')>=0}
