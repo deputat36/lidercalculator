@@ -1,0 +1,14 @@
+(function(){
+function q(s,r){return (r||document).querySelector(s)}
+function qa(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))}
+function toast(t){var x=document.getElementById('toast');if(x){x.textContent=t;x.classList.add('show');setTimeout(function(){x.classList.remove('show')},2200)}}
+function css(){if(document.getElementById('orderFlowCss'))return;var s=document.createElement('style');s.id='orderFlowCss';s.textContent='.order-flow-box{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#fff}.order-flow-box b{display:block;margin-bottom:6px}.order-flow-actions{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px}.order-flow-actions button{white-space:normal}@media(max-width:900px){.order-flow-actions{grid-template-columns:1fr}}';document.head.appendChild(s)}
+async function login(){var s=await window.db.auth.getSession();if(!s.data||!s.data.session)throw new Error('Сначала войдите в CRM')}
+async function upd(id,patch,msg){await login();var r=await window.db.from('leader_orders').update(patch).eq('id',id).select('id').single();if(r.error)throw new Error(r.error.message);toast(msg||'Заказ обновлён');if(window.LeaderV2Orders&&window.LeaderV2Orders.load)window.LeaderV2Orders.load(true).catch(function(){})}
+function now(){return new Date().toISOString()}
+function action(id,a){if(a==='work')return upd(id,{status:'В работе',accepted_at:now()},'Заказ переведён в работу');if(a==='ready')return upd(id,{status:'Готов',production_status:'Готов',ready_at:now(),completed_at:now()},'Заказ отмечен готовым');if(a==='issued')return upd(id,{status:'Выдан',production_status:'Выдан клиенту',issued_at:now()},'Заказ отмечен выданным');if(a==='paid')return upd(id,{payment_status:'Оплачено полностью',balance:0},'Заказ отмечен оплаченным')}
+function enhance(){css();qa('#ordersList .work-item[data-order]').forEach(function(card){var d=q('.order-detail',card);if(!d||d.dataset.flowReady)return;d.dataset.flowReady='1';var box=document.createElement('div');box.className='order-flow-box';box.innerHTML='<b>Быстрые этапы заказа</b><div class="order-flow-actions"><button data-flow-action="work">В работу</button><button data-flow-action="ready">Готов</button><button data-flow-action="issued">Выдан</button><button data-flow-action="paid">Оплачен</button></div>';d.insertBefore(box,d.firstChild)})}
+document.addEventListener('click',function(e){var b=e.target.closest('[data-flow-action]');if(!b)return;var card=b.closest('.work-item[data-order]');if(!card)return;action(card.dataset.order,b.dataset.flowAction).catch(function(x){alert(x.message)})});
+function boot(){enhance();var list=document.getElementById('ordersList');if(list&&window.MutationObserver){new MutationObserver(enhance).observe(list,{childList:true,subtree:true})}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,800)});else setTimeout(boot,500)
+})();
