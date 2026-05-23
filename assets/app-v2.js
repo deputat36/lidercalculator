@@ -7,6 +7,8 @@ const state = {
   user: null,
   profile: null,
   leads: [],
+  dashboardStats: null,
+  leadsLoaded: false,
   activeLead: null,
   rows: [],
 };
@@ -17,7 +19,7 @@ const sources = ['MAX','ВК','Звонок','Авито','Сайт','Яндек
 function $(id){ return document.getElementById(id); }
 function money(v){ return Math.round(Number(v || 0)).toLocaleString('ru-RU') + ' ₽'; }
 function esc(s){ return String(s ?? '').replace(/[&<>\"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m])); }
-function toast(text){ const t=$('toast'); t.textContent=text; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400); }
+function toast(text){ const t=$('toast'); if(!t) return; t.textContent=text; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400); }
 function dt(v){ try { return v ? new Date(v).toLocaleString('ru-RU') : '—'; } catch(e){ return v || '—'; } }
 function val(id){ return $(id)?.value?.trim() || ''; }
 function num(id){ return Number($(id)?.value || 0) || 0; }
@@ -46,7 +48,7 @@ async function checkAuth(){
     return false;
   }
   state.user = session.user;
-  state.profile = await getProfile(session.user);
+  if (!state.profile || state.profile.user_id !== session.user.id) state.profile = await getProfile(session.user);
   const role = state.profile?.role ? ' • роль: ' + state.profile.role : '';
   setAuth('Вход выполнен: ' + session.user.email + role, true);
   $('authForm').classList.add('hidden');
@@ -64,14 +66,20 @@ async function login(){
     setAuth('Вход не выполнен: ' + error.message);
     return alert(error.message);
   }
+  state.profile = null;
   await checkAuth();
-  await loadLeads();
+  await loadDashboard();
   toast('Вход выполнен');
 }
 
 async function logout(){
   await db.auth.signOut();
+  state.leads = [];
+  state.dashboardStats = null;
+  state.leadsLoaded = false;
   await checkAuth();
+  renderDashboard();
+  renderLeads();
   toast('Вы вышли из CRM');
 }
 
@@ -84,9 +92,25 @@ async function api(body){
   return data || {};
 }
 
+async function loadDashboard(){
+  $('todayList').innerHTML = '<div class="empty">Загружаю рабочий стол...</div>';
+  const data = await api({ action: 'dashboard' });
+  state.dashboardStats = data.stats || null;
+  state.leads = data.recent || [];
+  state.leadsLoaded = false;
+  fillSourceFilter();
+  renderDashboard();
+  renderLeadsPreviewNotice();
+  return state.leads;
+}
+
 async function loadLeads(){
-  const data = await api({ action: 'list' });
+  const box = $('leadList');
+  if (box) box.innerHTML = '<div class="empty">Загружаю заявки...</div>';
+  const data = await api({ action: 'list', limit: 100 });
   state.leads = data.leads || [];
+  state.leadsLoaded = true;
+  state.dashboardStats = null;
   fillSourceFilter();
   renderLeads();
   renderDashboard();
@@ -127,8 +151,17 @@ function filteredLeads(){
   });
 }
 
+function renderLeadsPreviewNotice(){
+  const box = $('leadList');
+  if (!box) return;
+  if (!state.leadsLoaded) {
+    box.innerHTML = '<div class="empty">Для ускорения CRM полный список заявок не загружается сразу. Нажмите «Обновить» во вкладке заявок, чтобы загрузить последние 100 заявок.</div>';
+  }
+}
+
 function renderLeads(){
   const box = $('leadList');
+  if (!state.leadsLoaded) return renderLeadsPreviewNotice();
   const list = filteredLeads();
   if (!list.length) {
     box.innerHTML = '<div class="empty">Заявок по выбранным условиям нет.</div>';
@@ -173,6 +206,7 @@ async function createManualLead(){
   });
   if (data.lead) state.leads = [data.lead, ...state.leads];
   closeLeadModal();
+  state.leadsLoaded = true;
   renderLeads();
   renderDashboard();
   toast('Заявка создана');
@@ -292,12 +326,21 @@ async function createOrder(){
 }
 
 function renderDashboard(){
-  const active = state.leads.filter(l => l.status !== 'Спам');
-  $('statNewLeads').textContent = active.filter(l => (l.status || 'Новая') === 'Новая').length;
-  $('statWorkLeads').textContent = active.filter(l => (l.status || '') === 'В работе').length;
-  $('statWaitingLeads').textContent = active.filter(l => ['Ждём ответ','КП отправлено','Уточнение деталей'].includes(l.status || '')).length;
-  $('statConvertedLeads').textContent = active.filter(l => (l.status || '') === 'Создан заказ').length;
-  const list = active.filter(l => ['Новая','В работе','Уточнение деталей','Ждём ответ','КП отправлено'].includes(l.status || 'Новая')).slice(0,6);
+  const s = state.dashboardStats;
+  if (s && !state.leadsLoaded) {
+    $('statNewLeads').textContent = s.new || 0;
+    $('statWorkLeads').textContent = s.work || 0;
+    $('statWaitingLeads').textContent = s.waiting || 0;
+    $('statConvertedLeads').textContent = s.converted || 0;
+  } else {
+    const active = state.leads.filter(l => l.status !== 'Спам');
+    $('statNewLeads').textContent = active.filter(l => (l.status || 'Новая') === 'Новая').length;
+    $('statWorkLeads').textContent = active.filter(l => (l.status || '') === 'В работе').length;
+    $('statWaitingLeads').textContent = active.filter(l => ['Ждём ответ','КП отправлено','Уточнение деталей'].includes(l.status || '')).length;
+    $('statConvertedLeads').textContent = active.filter(l => (l.status || '') === 'Создан заказ').length;
+  }
+  const activeList = state.leads.filter(l => l.status !== 'Спам');
+  const list = activeList.filter(l => ['Новая','В работе','Уточнение деталей','Ждём ответ','КП отправлено'].includes(l.status || 'Новая')).slice(0,6);
   $('todayList').innerHTML = list.map(l => `<div class="work-item"><b>${esc(l.name || 'Без имени')}</b> ${statusBadge(l.status || 'Новая')}<div class="meta">${esc(l.service || 'Услуга не указана')} • ${esc(l.phone || 'телефон не указан')}</div></div>`).join('') || '<div class="empty">Активных заявок нет.</div>';
 }
 
@@ -313,27 +356,31 @@ function openPage(id){
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === id));
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.page === id));
   if (id === 'dashboard') renderDashboard();
-  if (id === 'leads') renderLeads();
+  if (id === 'leads') {
+    if (!state.leadsLoaded) loadLeads().catch(e => alert(e.message));
+    else renderLeads();
+  }
   if (id === 'calc') renderCalcRows();
 }
 
 function bind(){
   $('loginBtn').onclick = login;
   $('logoutBtn').onclick = logout;
-  $('dashReloadBtn').onclick = () => loadLeads().then(() => toast('Данные обновлены')).catch(e => alert(e.message));
+  $('dashReloadBtn').onclick = () => loadDashboard().then(() => toast('Рабочий стол обновлён')).catch(e => alert(e.message));
   $('reloadLeadsBtn').onclick = () => loadLeads().then(() => toast('Заявки обновлены')).catch(e => alert(e.message));
   $('newLeadBtn').onclick = openLeadModal;
   $('closeLeadModal').onclick = closeLeadModal;
   $('saveLeadBtn').onclick = () => createManualLead().catch(e => alert(e.message));
-  $('leadStatusFilter').onchange = renderLeads;
-  $('leadSourceFilter').onchange = renderLeads;
-  $('leadSearch').oninput = renderLeads;
+  $('leadStatusFilter').onchange = () => { if (!state.leadsLoaded) loadLeads().catch(e => alert(e.message)); else renderLeads(); };
+  $('leadSourceFilter').onchange = () => { if (!state.leadsLoaded) loadLeads().catch(e => alert(e.message)); else renderLeads(); };
+  $('leadSearch').oninput = () => { if (state.leadsLoaded) renderLeads(); };
   $('addItemBtn').onclick = addItem;
   $('clearCalcBtn').onclick = () => { if(confirm('Очистить расчёт?')) { state.rows=[]; renderCalcRows(); } };
   $('quoteSentBtn').onclick = () => markQuoteSent().catch(e => alert(e.message));
   $('createOrderBtn').onclick = () => createOrder().catch(e => alert(e.message));
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => openPage(t.dataset.page));
   $('leadList').onclick = async (e) => {
+    if (!state.leadsLoaded) return;
     const card = e.target.closest('.lead-card');
     if (!card) return;
     const lead = state.leads.find(l => l.id === card.dataset.id);
@@ -346,6 +393,7 @@ function bind(){
     } catch(err) { alert(err.message); }
   };
   $('leadList').onchange = async (e) => {
+    if (!state.leadsLoaded) return;
     const card = e.target.closest('.lead-card');
     if (!card || e.target.dataset.action !== 'status') return;
     try { await updateLead(card.dataset.id, { status: e.target.value }); toast('Статус обновлён'); } catch(err) { alert(err.message); }
@@ -361,7 +409,7 @@ async function boot(){
   renderCalcRows();
   const ok = await checkAuth();
   if (ok) {
-    try { await loadLeads(); } catch(e) { toast('Не удалось загрузить заявки: ' + e.message); }
+    try { await loadDashboard(); } catch(e) { toast('Не удалось загрузить рабочий стол: ' + e.message); }
   } else {
     renderDashboard();
     renderLeads();
