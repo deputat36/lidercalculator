@@ -14,4 +14,5 @@
   loadScript('assets/app-v2-catalog'+'-calc.js');
   loadScript('assets/app-v2-calc'+'-editor.js');
   loadScript('assets/app-v2-calc'+'-summary.js');
+  loadScript('assets/app-v2-order-'+'aler'+'ts.js');
 })();
