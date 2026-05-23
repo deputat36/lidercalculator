@@ -6,6 +6,7 @@
       document.body.appendChild(s);
     }
   }
+  loadScript('assets/app-v2-startup-fix.js');
   loadScript('assets/app-v2-direct-api.js');
   loadScript('assets/app-v2-edge-guard.js');
   loadScript('assets/app-v2-dashboard.js');
