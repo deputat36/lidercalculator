@@ -1,5 +1,6 @@
 (function(){
 var allOrders=[];
+var ordersLoaded=false;
 function e(id){return document.getElementById(id)}
 function h(s){return String(s==null?'':s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
 function r(v){return Math.round(Number(v||0)).toLocaleString('ru-RU')+' ₽'}
@@ -26,11 +27,12 @@ async function updateDirect(id,patch){await needLogin();var x=await window.db.fr
 function dash(list){if(window.LeaderV2Dashboard&&window.LeaderV2Dashboard.updateOrders)window.LeaderV2Dashboard.updateOrders(list||[])}
 function design(list){var box=e('designList');if(!box)return;var arr=(list||[]).filter(isDesign);box.className=arr.length?'work-list':'work-list empty';box.innerHTML=arr.length?arr.map(function(o){return '<div class="work-item"><b>'+h(o.project_name||'Без названия')+'</b> '+b(o.layout_status)+'<div class="meta">'+h(o.item_types&&o.item_types.join(', ')||'')+' • '+r(o.client_total)+'</div></div>'}).join(''):'Пока нет задач дизайна.'}
 function renderOrders(){ensureTools();var box=e('ordersList');if(!box)return;var list=filtered();renderMetrics(list);box.className=list.length?'work-list':'work-list empty';box.innerHTML=list.length?list.map(html).join(''):'Заказов по выбранным условиям нет.'}
-async function load(silent){var box=e('ordersList');ensureTools();if(box&&!silent){box.className='work-list empty';box.textContent='Загружаю заказы...'}allOrders=await loadDirect();renderOrders();dash(allOrders);design(allOrders);return allOrders}
-async function upd(id,f,v){var p={};p[f]=v;await updateDirect(id,p);toast('Заказ обновлён');load(true).catch(function(){})}
-document.addEventListener('change',function(ev){var s=ev.target;if(!s.dataset||!s.dataset.f)return;var c=s.closest('[data-order]');if(!c)return;upd(c.dataset.order,s.dataset.f,s.value).catch(function(x){alert(x.message)})});
-function bind(){css();ensureTools();var btn=e('reloadOrdersBtn');if(btn){btn.onclick=function(){load(false).then(function(a){toast('Заказы обновлены: '+a.length)}).catch(function(x){alert(x.message)})}}document.querySelectorAll('[data-page="orders"],[data-page="dashboard"],[data-page="design"]').forEach(function(n){if(!n.dataset.pro){n.dataset.pro='1';n.addEventListener('click',function(){setTimeout(function(){load(true).catch(function(){})},300)})}})}
-function boot(){bind();setTimeout(function(){bind();load(true).catch(function(){})},800)}
-window.LeaderV2Orders={load:load,boot:boot,render:renderOrders};
+async function load(silent){var box=e('ordersList');ensureTools();if(box&&!silent){box.className='work-list empty';box.textContent='Загружаю заказы...'}allOrders=await loadDirect();ordersLoaded=true;renderOrders();dash(allOrders);design(allOrders);return allOrders}
+async function safeLoad(silent){try{return await load(silent)}catch(x){console.warn('Orders load failed:',x);var box=e('ordersList');if(box&&!silent){box.className='work-list empty';box.textContent='Не удалось загрузить заказы. Проверьте интернет и нажмите «Обновить».'}toast('Заказы пока не загрузились');return[]}}
+async function upd(id,f,v){var p={};p[f]=v;await updateDirect(id,p);toast('Заказ обновлён');safeLoad(true)}
+document.addEventListener('change',function(ev){var s=ev.target;if(!s.dataset||!s.dataset.f)return;var c=s.closest('[data-order]');if(!c)return;upd(c.dataset.order,s.dataset.f,s.value).catch(function(x){toast('Не удалось обновить заказ')})});
+function bind(){css();ensureTools();var btn=e('reloadOrdersBtn');if(btn){btn.onclick=function(){safeLoad(false).then(function(a){if(a.length)toast('Заказы обновлены: '+a.length)})}}document.querySelectorAll('[data-page="orders"]').forEach(function(tab){if(!tab.dataset.ordersLazy){tab.dataset.ordersLazy='1';tab.addEventListener('click',function(){setTimeout(function(){if(!ordersLoaded)safeLoad(false)},200)})}})}
+function boot(){bind();var box=e('ordersList');if(box){box.className='work-list empty';box.textContent='Заказы загрузятся при открытии вкладки или по кнопке «Обновить».'}}
+window.LeaderV2Orders={load:safeLoad,boot:boot,render:renderOrders};
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',boot)}else{boot()}
 })();
