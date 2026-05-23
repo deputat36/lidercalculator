@@ -13,6 +13,7 @@
   loadScript('assets/app-v2-orders-pro.js');
   loadScript('assets/app-v2-catalog'+'-calc.js');
   loadScript('assets/app-v2-catalog'+'-meta.js');
+  loadScript('assets/app-v2-catalog'+'-advanced.js');
   loadScript('assets/app-v2-calc'+'-editor.js');
   loadScript('assets/app-v2-calc'+'-summary.js');
   loadScript('assets/app-v2-order-'+'aler'+'ts.js');
