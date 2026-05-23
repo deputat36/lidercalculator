@@ -1,6 +1,13 @@
-const SUPABASE_URL = 'https://ofewxuqfjhamgerwzull.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_ZiX8_Mnf0dY6S__tKO2A4A_uD94G2cs';
-const db = window.db || supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+const SUPABASE_URL = window.LEADER_SUPABASE_URL || 'https://ofewxuqfjhamgerwzull.supabase.co';
+const SUPABASE_KEY = window.LEADER_SUPABASE_KEY || 'sb_publishable_ZiX8_Mnf0dY6S__tKO2A4A_uD94G2cs';
+const db = window.db || supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+    storageKey: window.LEADER_SUPABASE_AUTH_STORAGE || 'leader_session_v1'
+  }
+});
 window.db = db;
 
 const state = {
@@ -11,9 +18,11 @@ const state = {
   leadsLoaded: false,
   activeLead: null,
   rows: [],
+  authBusy: false,
+  crmReady: false,
 };
 
-const statuses = ['Новая','В работе','Уточнение деталей','Расчёт подготовлен','КП отправлено','Ждём ответ','Нужно пересчитать','Согласовано','Создан заказ','Отказ','Не отвечает','Дорого','Передумал'];
+const statuses = ['Новая','В работе','Уточнение деталей','Расчёт подготовлен','КП отправлено','Ждём ответ','Нужно пересчитать','Согласовано','Создан заказ','Отказ','Не отвечает','Дорого','Передумал','Спам'];
 const sources = ['MAX','ВК','Звонок','Авито','Сайт','Яндекс Карты','2ГИС','Рекомендация','Постоянный клиент','Другое'];
 
 function $(id){ return document.getElementById(id); }
@@ -23,64 +32,207 @@ function toast(text){ const t=$('toast'); if(!t) return; t.textContent=text; t.c
 function dt(v){ try { return v ? new Date(v).toLocaleString('ru-RU') : '—'; } catch(e){ return v || '—'; } }
 function val(id){ return $(id)?.value?.trim() || ''; }
 function num(id){ return Number($(id)?.value || 0) || 0; }
+function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+function withTimeout(promise, ms, message){
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message || 'Превышено время ожидания')), ms))
+  ]);
+}
 
 function setAuth(text, ok=false){
   const e = $('authState');
+  if (!e) return;
   e.textContent = text;
   e.className = 'auth-state ' + (ok ? 'good' : 'warn');
 }
 
+function setAuthBusy(on, text='Вхожу...'){
+  state.authBusy = Boolean(on);
+  const loginBtn = $('loginBtn');
+  const logoutBtn = $('logoutBtn');
+  const resetBtn = $('resetAuthBtn');
+  if (loginBtn) {
+    loginBtn.disabled = Boolean(on);
+    loginBtn.textContent = on ? text : 'Войти';
+  }
+  if (logoutBtn) logoutBtn.disabled = Boolean(on);
+  if (resetBtn) resetBtn.disabled = Boolean(on);
+}
+
+function clearLeaderSession(){
+  const patterns = ['leader_session_v1', 'leader_', 'ofewxuqfjhamgerwzull-auth-token'];
+  try {
+    Object.keys(localStorage).forEach(key => {
+      if (patterns.some(p => key.indexOf(p) >= 0)) localStorage.removeItem(key);
+    });
+  } catch(e) {}
+  try {
+    Object.keys(sessionStorage).forEach(key => {
+      if (patterns.some(p => key.indexOf(p) >= 0)) sessionStorage.removeItem(key);
+    });
+  } catch(e) {}
+}
+
+function ensureResetAuthButton(){
+  const host = document.querySelector('.auth-card');
+  if (!host || $('resetAuthBtn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'resetAuthBtn';
+  btn.type = 'button';
+  btn.textContent = 'Сбросить вход';
+  btn.title = 'Очистить устаревшую сессию CRM «Лидер»';
+  btn.onclick = async () => {
+    if (state.authBusy) return;
+    setAuthBusy(true, 'Сбрасываю...');
+    try { await db.auth.signOut(); } catch(e) {}
+    clearLeaderSession();
+    state.user = null;
+    state.profile = null;
+    state.crmReady = false;
+    $('authForm')?.classList.remove('hidden');
+    $('logoutBtn')?.classList.add('hidden');
+    setAuth('Сессия очищена. Введите email и пароль заново.');
+    renderDashboard();
+    renderLeads();
+    toast('Старая сессия очищена');
+    setAuthBusy(false);
+  };
+  host.appendChild(btn);
+}
+
 async function getProfile(user){
-  const { data, error } = await db.from('leader_user_profiles').select('email,role,is_active,full_name').eq('user_id', user.id).maybeSingle();
+  const { data, error } = await withTimeout(
+    db.from('leader_user_profiles').select('email,role,is_active,full_name').eq('user_id', user.id).maybeSingle(),
+    12000,
+    'Профиль пользователя не загрузился за 12 секунд'
+  );
   if (error) return null;
   return data;
 }
 
-async function checkAuth(){
-  const { data } = await db.auth.getSession();
-  const session = data.session;
+function applyAuthUi(session, profile){
   if (!session?.user) {
     state.user = null;
     state.profile = null;
+    state.crmReady = false;
     setAuth('Вход не выполнен. Введите email и пароль.');
-    $('authForm').classList.remove('hidden');
-    $('logoutBtn').classList.add('hidden');
+    $('authForm')?.classList.remove('hidden');
+    $('logoutBtn')?.classList.add('hidden');
     return false;
   }
   state.user = session.user;
-  if (!state.profile || state.profile.user_id !== session.user.id) state.profile = await getProfile(session.user);
+  state.profile = profile || state.profile || null;
   const role = state.profile?.role ? ' • роль: ' + state.profile.role : '';
   setAuth('Вход выполнен: ' + session.user.email + role, true);
-  $('authForm').classList.add('hidden');
-  $('logoutBtn').classList.remove('hidden');
+  $('authForm')?.classList.add('hidden');
+  $('logoutBtn')?.classList.remove('hidden');
   return true;
 }
 
+async function checkAuth(){
+  try {
+    setAuth('Проверяю вход...');
+    const { data } = await withTimeout(db.auth.getSession(), 12000, 'Проверка входа не ответила за 12 секунд');
+    const session = data.session;
+    if (!session?.user) return applyAuthUi(null, null);
+    const profile = await getProfile(session.user);
+    return applyAuthUi(session, profile);
+  } catch(e) {
+    const msg = String(e.message || e).toLowerCase();
+    if (msg.includes('expired') || msg.includes('refresh') || msg.includes('jwt')) {
+      clearLeaderSession();
+      state.user = null;
+      state.profile = null;
+      state.crmReady = false;
+      $('authForm')?.classList.remove('hidden');
+      $('logoutBtn')?.classList.add('hidden');
+      setAuth('Старая сессия устарела. Нажмите «Войти» заново.');
+      return false;
+    }
+    setAuth('Ошибка проверки входа: ' + e.message);
+    $('authForm')?.classList.remove('hidden');
+    $('logoutBtn')?.classList.add('hidden');
+    return false;
+  }
+}
+
+async function loadCrmData(){
+  setAuth('Вход выполнен. Загружаю заявки...', true);
+  await loadLeads();
+  state.leadsLoaded = true;
+  setAuth('Заявки загружены. Загружаю заказы...', true);
+  try {
+    if (window.LeaderV2Orders?.load) await window.LeaderV2Orders.load(true);
+  } catch(e) {
+    console.warn('Orders load failed', e);
+    toast('Заказы не загрузились: ' + e.message);
+  }
+  try {
+    if (window.LeaderV2Clients?.load) await window.LeaderV2Clients.load(true);
+  } catch(e) {
+    console.warn('Clients load failed', e);
+  }
+  state.crmReady = true;
+  const role = state.profile?.role ? ' • роль: ' + state.profile.role : '';
+  setAuth('CRM готова: ' + (state.user?.email || 'пользователь') + role, true);
+}
+
 async function login(){
+  if (state.authBusy) return;
   const email = val('loginEmail');
   const password = val('loginPassword');
   if (!email || !password) return alert('Введите email и пароль');
+  setAuthBusy(true, 'Вхожу...');
   setAuth('Выполняю вход...');
-  const { error } = await db.auth.signInWithPassword({ email, password });
-  if (error) {
-    setAuth('Вход не выполнен: ' + error.message);
-    return alert(error.message);
+  try {
+    clearLeaderSession();
+    await sleep(100);
+    const { data, error } = await withTimeout(
+      db.auth.signInWithPassword({ email, password }),
+      25000,
+      'Сервер входа не ответил за 25 секунд. Проверьте интернет и попробуйте ещё раз.'
+    );
+    if (error) {
+      setAuth('Вход не выполнен: ' + error.message);
+      alert(error.message);
+      return;
+    }
+    const session = data?.session || null;
+    if (!session?.user) {
+      setAuth('Вход не выполнен: сессия не получена');
+      return;
+    }
+    const profile = await getProfile(session.user);
+    applyAuthUi(session, profile);
+    await loadCrmData();
+    toast('Вход выполнен, CRM готова');
+  } catch(e) {
+    setAuth('Ошибка входа: ' + e.message);
+    alert(e.message);
+  } finally {
+    setAuthBusy(false);
   }
-  state.profile = null;
-  await checkAuth();
-  await loadDashboard();
-  toast('Вход выполнен');
 }
 
 async function logout(){
-  await db.auth.signOut();
+  if (state.authBusy) return;
+  setAuthBusy(true, 'Выхожу...');
+  setAuth('Выполняю выход...');
+  try { await withTimeout(db.auth.signOut(), 10000, 'Выход не завершился за 10 секунд'); } catch(e) {}
+  clearLeaderSession();
+  state.user = null;
+  state.profile = null;
+  state.crmReady = false;
   state.leads = [];
-  state.dashboardStats = null;
-  state.leadsLoaded = false;
-  await checkAuth();
+  state.activeLead = null;
+  state.rows = [];
+  applyAuthUi(null, null);
   renderDashboard();
   renderLeads();
+  renderCalcRows();
   toast('Вы вышли из CRM');
+  setAuthBusy(false);
 }
 
 async function api(body){
@@ -92,25 +244,9 @@ async function api(body){
   return data || {};
 }
 
-async function loadDashboard(){
-  $('todayList').innerHTML = '<div class="empty">Загружаю рабочий стол...</div>';
-  const data = await api({ action: 'dashboard' });
-  state.dashboardStats = data.stats || null;
-  state.leads = data.recent || [];
-  state.leadsLoaded = false;
-  fillSourceFilter();
-  renderDashboard();
-  renderLeadsPreviewNotice();
-  return state.leads;
-}
-
 async function loadLeads(){
-  const box = $('leadList');
-  if (box) box.innerHTML = '<div class="empty">Загружаю заявки...</div>';
-  const data = await api({ action: 'list', limit: 100 });
+  const data = await api({ action: 'list' });
   state.leads = data.leads || [];
-  state.leadsLoaded = true;
-  state.dashboardStats = null;
   fillSourceFilter();
   renderLeads();
   renderDashboard();
@@ -119,6 +255,7 @@ async function loadLeads(){
 
 function fillSourceFilter(){
   const sel = $('leadSourceFilter');
+  if (!sel) return;
   const old = sel.value || 'Все';
   const set = new Set(['Все']);
   state.leads.forEach(l => set.add(l.source || 'Не указан'));
@@ -135,8 +272,8 @@ function statusBadge(status){
 }
 
 function filteredLeads(){
-  const status = $('leadStatusFilter').value;
-  const source = $('leadSourceFilter').value;
+  const status = $('leadStatusFilter')?.value || 'active';
+  const source = $('leadSourceFilter')?.value || 'Все';
   const q = val('leadSearch').toLowerCase();
   return state.leads.filter(l => {
     const st = l.status || 'Новая';
@@ -151,17 +288,9 @@ function filteredLeads(){
   });
 }
 
-function renderLeadsPreviewNotice(){
-  const box = $('leadList');
-  if (!box) return;
-  if (!state.leadsLoaded) {
-    box.innerHTML = '<div class="empty">Для ускорения CRM полный список заявок не загружается сразу. Нажмите «Обновить» во вкладке заявок, чтобы загрузить последние 100 заявок.</div>';
-  }
-}
-
 function renderLeads(){
   const box = $('leadList');
-  if (!state.leadsLoaded) return renderLeadsPreviewNotice();
+  if (!box) return;
   const list = filteredLeads();
   if (!list.length) {
     box.innerHTML = '<div class="empty">Заявок по выбранным условиям нет.</div>';
@@ -206,7 +335,6 @@ async function createManualLead(){
   });
   if (data.lead) state.leads = [data.lead, ...state.leads];
   closeLeadModal();
-  state.leadsLoaded = true;
   renderLeads();
   renderDashboard();
   toast('Заявка создана');
@@ -244,6 +372,7 @@ function guessOrderType(text){
 
 function showActiveLead(){
   const box = $('activeLeadBox');
+  if (!box) return;
   if (!state.activeLead) { box.classList.add('hidden'); box.innerHTML = ''; return; }
   box.classList.remove('hidden');
   box.innerHTML = `<b>Расчёт связан с заявкой:</b> ${esc(state.activeLead.name || 'Без имени')} • ${esc(state.activeLead.service || 'Услуга не указана')} <button id="unlinkLeadBtn">Отвязать</button>`;
@@ -276,6 +405,7 @@ function calcTotals(){
 
 function renderCalcRows(){
   const tb = $('calcRows');
+  if (!tb) return;
   tb.innerHTML = state.rows.map((r,i) => `
     <tr>
       <td>${esc(r.type)}</td><td>${esc(r.name)}</td><td>${esc(r.unit)}</td><td>${r.qty}</td>
@@ -311,7 +441,23 @@ async function createOrder(){
     layout_status: val('calcLayoutStatus'),
     comment: val('calcComment'),
     payment_status: 'Не оплачено',
-    rows: state.rows.map(r => ({ name: `[${r.type}] ${r.name}`, unit: r.unit, qty: r.qty, price: r.price, client_sum: Number(r.client||0)*Number(r.qty||0), contractor_sum: Number(r.price||0)*Number(r.qty||0), comment: r.comment })),
+    rows: state.rows.map(r => ({
+      catalog_id: r.catalog_id || null,
+      category: r.category || null,
+      item_type: r.item_type || r.type,
+      calculation_mode: r.calculation_mode || null,
+      min_client_price: r.min_client_price ?? null,
+      default_client_price: r.default_client_price ?? null,
+      markup_percent: r.markup_percent ?? null,
+      name: `[${r.type}] ${r.name}`,
+      unit: r.unit,
+      qty: r.qty,
+      price: r.price,
+      client_sum: Number(r.client||0)*Number(r.qty||0),
+      contractor_sum: Number(r.price||0)*Number(r.qty||0),
+      comment: r.comment,
+      data: r.data || {}
+    })),
     totals,
   });
   if (data.order) {
@@ -321,66 +467,56 @@ async function createOrder(){
     state.activeLead = null;
     showActiveLead();
     await loadLeads();
+    if (window.LeaderV2Orders?.load) await window.LeaderV2Orders.load(true).catch(() => {});
     openPage('orders');
   }
 }
 
 function renderDashboard(){
-  const s = state.dashboardStats;
-  if (s && !state.leadsLoaded) {
-    $('statNewLeads').textContent = s.new || 0;
-    $('statWorkLeads').textContent = s.work || 0;
-    $('statWaitingLeads').textContent = s.waiting || 0;
-    $('statConvertedLeads').textContent = s.converted || 0;
-  } else {
-    const active = state.leads.filter(l => l.status !== 'Спам');
-    $('statNewLeads').textContent = active.filter(l => (l.status || 'Новая') === 'Новая').length;
-    $('statWorkLeads').textContent = active.filter(l => (l.status || '') === 'В работе').length;
-    $('statWaitingLeads').textContent = active.filter(l => ['Ждём ответ','КП отправлено','Уточнение деталей'].includes(l.status || '')).length;
-    $('statConvertedLeads').textContent = active.filter(l => (l.status || '') === 'Создан заказ').length;
-  }
-  const activeList = state.leads.filter(l => l.status !== 'Спам');
-  const list = activeList.filter(l => ['Новая','В работе','Уточнение деталей','Ждём ответ','КП отправлено'].includes(l.status || 'Новая')).slice(0,6);
-  $('todayList').innerHTML = list.map(l => `<div class="work-item"><b>${esc(l.name || 'Без имени')}</b> ${statusBadge(l.status || 'Новая')}<div class="meta">${esc(l.service || 'Услуга не указана')} • ${esc(l.phone || 'телефон не указан')}</div></div>`).join('') || '<div class="empty">Активных заявок нет.</div>';
+  const active = state.leads.filter(l => l.status !== 'Спам');
+  if ($('statNewLeads')) $('statNewLeads').textContent = active.filter(l => (l.status || 'Новая') === 'Новая').length;
+  if ($('statWorkLeads')) $('statWorkLeads').textContent = active.filter(l => (l.status || '') === 'В работе').length;
+  if ($('statWaitingLeads')) $('statWaitingLeads').textContent = active.filter(l => ['Ждём ответ','КП отправлено','Уточнение деталей'].includes(l.status || '')).length;
+  if ($('statConvertedLeads')) $('statConvertedLeads').textContent = active.filter(l => (l.status || '') === 'Создан заказ').length;
+  const list = active.filter(l => ['Новая','В работе','Уточнение деталей','Ждём ответ','КП отправлено'].includes(l.status || 'Новая')).slice(0,6);
+  if ($('todayList')) $('todayList').innerHTML = list.map(l => `<div class="work-item"><b>${esc(l.name || 'Без имени')}</b> ${statusBadge(l.status || 'Новая')}<div class="meta">${esc(l.service || 'Услуга не указана')} • ${esc(l.phone || 'телефон не указан')}</div></div>`).join('') || '<div class="empty">Активных заявок нет.</div>';
 }
 
 function openLeadModal(){
-  ['leadName','leadPhone','leadService','leadBudget','leadMessage'].forEach(id => $(id).value = '');
-  $('leadSource').value = 'MAX';
-  $('leadCity').value = 'Борисоглебск';
-  $('leadModal').classList.remove('hidden');
+  ['leadName','leadPhone','leadService','leadBudget','leadMessage'].forEach(id => { if($(id)) $(id).value = ''; });
+  if ($('leadSource')) $('leadSource').value = 'MAX';
+  if ($('leadCity')) $('leadCity').value = 'Борисоглебск';
+  $('leadModal')?.classList.remove('hidden');
 }
-function closeLeadModal(){ $('leadModal').classList.add('hidden'); }
+function closeLeadModal(){ $('leadModal')?.classList.add('hidden'); }
 
 function openPage(id){
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === id));
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.page === id));
   if (id === 'dashboard') renderDashboard();
-  if (id === 'leads') {
-    if (!state.leadsLoaded) loadLeads().catch(e => alert(e.message));
-    else renderLeads();
-  }
+  if (id === 'leads') renderLeads();
   if (id === 'calc') renderCalcRows();
+  if (id === 'orders' && window.LeaderV2Orders?.load) window.LeaderV2Orders.load(true).catch(() => {});
 }
 
 function bind(){
-  $('loginBtn').onclick = login;
-  $('logoutBtn').onclick = logout;
-  $('dashReloadBtn').onclick = () => loadDashboard().then(() => toast('Рабочий стол обновлён')).catch(e => alert(e.message));
-  $('reloadLeadsBtn').onclick = () => loadLeads().then(() => toast('Заявки обновлены')).catch(e => alert(e.message));
-  $('newLeadBtn').onclick = openLeadModal;
-  $('closeLeadModal').onclick = closeLeadModal;
-  $('saveLeadBtn').onclick = () => createManualLead().catch(e => alert(e.message));
-  $('leadStatusFilter').onchange = () => { if (!state.leadsLoaded) loadLeads().catch(e => alert(e.message)); else renderLeads(); };
-  $('leadSourceFilter').onchange = () => { if (!state.leadsLoaded) loadLeads().catch(e => alert(e.message)); else renderLeads(); };
-  $('leadSearch').oninput = () => { if (state.leadsLoaded) renderLeads(); };
-  $('addItemBtn').onclick = addItem;
-  $('clearCalcBtn').onclick = () => { if(confirm('Очистить расчёт?')) { state.rows=[]; renderCalcRows(); } };
-  $('quoteSentBtn').onclick = () => markQuoteSent().catch(e => alert(e.message));
-  $('createOrderBtn').onclick = () => createOrder().catch(e => alert(e.message));
+  ensureResetAuthButton();
+  if ($('loginBtn')) $('loginBtn').onclick = login;
+  if ($('logoutBtn')) $('logoutBtn').onclick = logout;
+  if ($('dashReloadBtn')) $('dashReloadBtn').onclick = () => loadCrmData().then(() => toast('Данные обновлены')).catch(e => alert(e.message));
+  if ($('reloadLeadsBtn')) $('reloadLeadsBtn').onclick = () => loadLeads().then(() => toast('Заявки обновлены')).catch(e => alert(e.message));
+  if ($('newLeadBtn')) $('newLeadBtn').onclick = openLeadModal;
+  if ($('closeLeadModal')) $('closeLeadModal').onclick = closeLeadModal;
+  if ($('saveLeadBtn')) $('saveLeadBtn').onclick = () => createManualLead().catch(e => alert(e.message));
+  if ($('leadStatusFilter')) $('leadStatusFilter').onchange = renderLeads;
+  if ($('leadSourceFilter')) $('leadSourceFilter').onchange = renderLeads;
+  if ($('leadSearch')) $('leadSearch').oninput = renderLeads;
+  if ($('addItemBtn')) $('addItemBtn').onclick = addItem;
+  if ($('clearCalcBtn')) $('clearCalcBtn').onclick = () => { if(confirm('Очистить расчёт?')) { state.rows=[]; renderCalcRows(); } };
+  if ($('quoteSentBtn')) $('quoteSentBtn').onclick = () => markQuoteSent().catch(e => alert(e.message));
+  if ($('createOrderBtn')) $('createOrderBtn').onclick = () => createOrder().catch(e => alert(e.message));
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => openPage(t.dataset.page));
-  $('leadList').onclick = async (e) => {
-    if (!state.leadsLoaded) return;
+  if ($('leadList')) $('leadList').onclick = async (e) => {
     const card = e.target.closest('.lead-card');
     if (!card) return;
     const lead = state.leads.find(l => l.id === card.dataset.id);
@@ -392,13 +528,12 @@ function bind(){
       if (action === 'spam') await updateLead(lead.id, { status: 'Спам' });
     } catch(err) { alert(err.message); }
   };
-  $('leadList').onchange = async (e) => {
-    if (!state.leadsLoaded) return;
+  if ($('leadList')) $('leadList').onchange = async (e) => {
     const card = e.target.closest('.lead-card');
     if (!card || e.target.dataset.action !== 'status') return;
     try { await updateLead(card.dataset.id, { status: e.target.value }); toast('Статус обновлён'); } catch(err) { alert(err.message); }
   };
-  $('calcRows').onclick = (e) => {
+  if ($('calcRows')) $('calcRows').onclick = (e) => {
     const i = e.target.dataset.remove;
     if (i !== undefined) { state.rows.splice(Number(i),1); renderCalcRows(); }
   };
@@ -407,12 +542,11 @@ function bind(){
 async function boot(){
   bind();
   renderCalcRows();
+  renderDashboard();
+  renderLeads();
   const ok = await checkAuth();
   if (ok) {
-    try { await loadDashboard(); } catch(e) { toast('Не удалось загрузить рабочий стол: ' + e.message); }
-  } else {
-    renderDashboard();
-    renderLeads();
+    try { await loadCrmData(); } catch(e) { toast('Не удалось загрузить CRM: ' + e.message); }
   }
 }
 
