@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>РА Лидер — диагностика CRM</title>
+<meta name="theme-color" content="#111827">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-bridge.js?v=20260523-check-1"></script>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;--good:#166534;--warn:#92400e;--bad:#991b1b;--blue:#2563eb}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}.wrap{max-width:980px;margin:0 auto;padding:18px}.top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 8px 20px rgba(15,23,42,.04)}h1{margin:0;font-size:24px}h2{margin:0 0 10px;font-size:18px}p{margin:6px 0;color:var(--muted);line-height:1.5}.auth{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}.buttons{display:flex;flex-wrap:wrap;gap:8px}.btn,button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;font-weight:800;cursor:pointer}.primary{background:var(--blue);color:#fff;border-color:var(--blue)}input{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px}.status{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:6px 10px;font-weight:800;font-size:13px}.status.good{background:#dcfce7;color:var(--good)}.status.warn{background:#fef3c7;color:var(--warn)}.status.bad{background:#fee2e2;color:var(--bad)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.test{border:1px solid var(--line);border-radius:14px;padding:12px;background:#fff}.test-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.test-title{font-weight:900}.meta{color:var(--muted);font-size:13px;line-height:1.45;margin-top:6px;overflow-wrap:anywhere}.log{white-space:pre-wrap;background:#0f172a;color:#e5e7eb;border-radius:14px;padding:12px;max-height:340px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}.small{font-size:12px;color:var(--muted)}@media(max-width:760px){.top{display:block}.auth{grid-template-columns:1fr}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Диагностика CRM «Лидер»</h1>
+      <p>Страница проверяет вход, сессию, профиль, доступ к заявкам, заказам, клиентам и номенклатуре.</p>
+    </div>
+    <div class="buttons">
+      <a class="btn" href="app-v2.html">Вернуться в CRM</a>
+      <button id="clearBtn">Сбросить сессию</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Вход</h2>
+    <div id="authStatus" class="status warn">Проверка не запускалась</div>
+    <p class="small">Если уже входил в CRM, пароль вводить не нужно — нажми «Проверить всё».</p>
+    <div class="auth" style="margin-top:10px">
+      <input id="email" type="email" placeholder="email">
+      <input id="password" type="password" placeholder="пароль">
+      <button id="loginBtn" class="primary">Войти</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="buttons">
+      <button id="runBtn" class="primary">Проверить всё</button>
+      <button id="sessionBtn">Проверить только сессию</button>
+      <button id="dataBtn">Проверить только данные</button>
+    </div>
+  </div>
+
+  <div class="grid" id="tests"></div>
+
+  <div class="card">
+    <h2>Журнал проверки</h2>
+    <div id="log" class="log">Готов к проверке.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+var testsEl=document.getElementById('tests');
+var logEl=document.getElementById('log');
+var authEl=document.getElementById('authStatus');
+var results={};
+function now(){return new Date().toLocaleTimeString('ru-RU')}
+function log(s){logEl.textContent+='\n['+now()+'] '+s;logEl.scrollTop=logEl.scrollHeight}
+function cls(ok){return ok===true?'good':ok===false?'bad':'warn'}
+function label(ok){return ok===true?'OK':ok===false?'ОШИБКА':'ОЖИДАНИЕ'}
+function setAuth(text,ok){authEl.className='status '+cls(ok);authEl.textContent=text}
+function setTest(key,title,ok,meta){results[key]={title:title,ok:ok,meta:meta||''};render()}
+function render(){
+  var order=['supabase','session','profile','leads','orders','clients','catalog','speed'];
+  testsEl.innerHTML=order.map(function(k){var r=results[k]||{title:k,ok:null,meta:'Не запускалось'};return '<div class="test"><div class="test-head"><div class="test-title">'+escapeHtml(r.title)+'</div><span class="status '+cls(r.ok)+'">'+label(r.ok)+'</span></div><div class="meta">'+escapeHtml(r.meta)+'</div></div>'}).join('')
+}
+function escapeHtml(s){return String(s==null?'':s).replace(/[&<>\"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]})}
+function timeout(p,ms,text){return Promise.race([p,new Promise(function(_,reject){setTimeout(function(){reject(new Error(text||'Превышено время ожидания'))},ms)})])}
+async function getSession(){var r=await timeout(window.db.auth.getSession(),12000,'Сессия не ответила за 12 сек.');return r.data&&r.data.session?r.data.session:null}
+async function checkSession(){
+  setTest('supabase','Supabase подключён',!!window.db,'window.db: '+(window.db?'есть':'нет'));
+  if(!window.db)throw new Error('Supabase client не создан');
+  var s=await getSession();
+  setTest('session','Сессия пользователя',!!s,s&&s.user?'email: '+s.user.email:'Сессии нет. Войдите ниже или в основной CRM.');
+  setAuth(s?'Вход выполнен: '+s.user.email:'Вход не выполнен',!!s);
+  if(!s)throw new Error('Нет сессии');
+  var p=await timeout(window.db.from('leader_user_profiles').select('user_id,email,role,is_active,full_name').eq('user_id',s.user.id).maybeSingle(),12000,'Профиль не ответил за 12 сек.');
+  if(p.error)throw new Error(p.error.message);
+  setTest('profile','Профиль CRM',!!(p.data&&p.data.is_active),p.data?'роль: '+p.data.role+', активен: '+p.data.is_active:'Профиль не найден');
+  return s;
+}
+async function countTest(key,title,table,query){
+  var t0=performance.now();
+  var q=query||window.db.from(table).select('*',{count:'exact',head:true});
+  var r=await timeout(q,15000,title+' не ответил за 15 сек.');
+  var ms=Math.round(performance.now()-t0);
+  if(r.error)throw new Error(r.error.message);
+  setTest(key,title,true,'count: '+(r.count==null?'—':r.count)+', время: '+ms+' мс');
+  return ms;
+}
+async function dataTests(){
+  var times=[];
+  times.push(await countTest('leads','Заявки leader_leads','leader_leads'));
+  times.push(await countTest('orders','Заказы leader_orders','leader_orders'));
+  times.push(await countTest('clients','Клиенты leader_clients','leader_clients'));
+  var t0=performance.now();
+  var cat=await timeout(window.db.from('leader_catalog').select('id,name,category,unit,settings').eq('is_active',true).order('sort_order',{ascending:true}),15000,'Каталог не ответил за 15 сек.');
+  var ms=Math.round(performance.now()-t0); times.push(ms);
+  if(cat.error)throw new Error(cat.error.message);
+  var ok=(cat.data||[]).length>0;
+  setTest('catalog','Номенклатура leader_catalog',ok,'активных позиций: '+(cat.data||[]).length+', время: '+ms+' мс');
+  var avg=Math.round(times.reduce(function(a,b){return a+b},0)/times.length);
+  setTest('speed','Средняя скорость чтения',avg<2500,'среднее время: '+avg+' мс');
+}
+async function runAll(){
+  logEl.textContent='Запускаю полную проверку...';
+  try{await checkSession();log('Сессия и профиль проверены.');await dataTests();log('Данные проверены.');}
+  catch(e){log('Ошибка: '+e.message)}
+}
+async function login(){
+  var email=document.getElementById('email').value.trim();
+  var password=document.getElementById('password').value;
+  if(!email||!password){alert('Введите email и пароль');return}
+  setAuth('Выполняю вход...',null);log('Выполняю вход...');
+  try{var r=await timeout(window.db.auth.signInWithPassword({email:email,password:password}),25000,'Вход не ответил за 25 сек.');if(r.error)throw new Error(r.error.message);setAuth('Вход выполнен: '+r.data.user.email,true);log('Вход выполнен. Запускаю проверку.');await runAll();}
+  catch(e){setAuth('Ошибка входа: '+e.message,false);log('Ошибка входа: '+e.message)}
+}
+async function clear(){try{await window.db.auth.signOut()}catch(e){};try{Object.keys(localStorage).forEach(function(k){if(k.indexOf('leader_')>=0||k.indexOf('ofewxuqfjhamgerwzull')>=0)localStorage.removeItem(k)})}catch(e){};setAuth('Сессия очищена',false);log('Сессия очищена.');}
+document.getElementById('runBtn').onclick=runAll;
+document.getElementById('sessionBtn').onclick=function(){logEl.textContent='Проверяю сессию...';checkSession().catch(function(e){log('Ошибка: '+e.message)})};
+document.getElementById('dataBtn').onclick=function(){logEl.textContent='Проверяю данные...';dataTests().catch(function(e){log('Ошибка: '+e.message)})};
+document.getElementById('loginBtn').onclick=login;
+document.getElementById('clearBtn').onclick=clear;
+render();
+setTimeout(function(){checkSession().then(function(){log('Автопроверка сессии прошла.')}).catch(function(e){log('Автопроверка: '+e.message)})},500);
+})();
+</script>
+</body>
+</html>
