@@ -7,13 +7,14 @@
       document.body.appendChild(s);
     }
   }
-  var v='?v=20260524-14';
+  var v='?v=20260524-15';
   loadScript('assets/app-v2-speed-core.js'+v);
   loadScript('assets/app-v2-dashboard.js'+v);
   loadScript('assets/app-v2-orders-pro.js'+v);
   loadScript('assets/app-v2-order'+'-card.js'+v);
   loadScript('assets/app-v2-production.js'+v);
   loadScript('assets/app-v2-production-link.js'+v);
+  loadScript('assets/app-v2-production-brief.js'+v);
   loadScript('assets/app-v2-catalog'+'-calc.js'+v);
   loadScript('assets/app-v2-catalog'+'-meta.js'+v);
   loadScript('assets/app-v2-catalog'+'-advanced.js'+v);
