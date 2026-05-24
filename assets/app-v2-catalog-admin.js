@@ -15,7 +15,7 @@
     if(e('catalogAdminCss')) return;
     var s = document.createElement('style');
     s.id = 'catalogAdminCss';
-    s.textContent = '.catalog-admin-tools{display:grid;grid-template-columns:220px 220px 1fr auto;gap:10px;margin:12px 0}.catalog-admin-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:10px 0 14px}.catalog-admin-metrics>div{background:#f9fafb;border:1px solid var(--line);border-radius:12px;padding:10px}.catalog-admin-metrics span{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}.catalog-admin-metrics b{font-size:16px}.catalog-table{width:100%;border-collapse:collapse}.catalog-table th,.catalog-table td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}.catalog-table th{font-size:12px;color:var(--muted);font-weight:900}.catalog-row-title{font-weight:900;color:#111827}.catalog-row-meta{font-size:12px;color:var(--muted);line-height:1.35;margin-top:3px}.catalog-price-grid{display:grid;grid-template-columns:repeat(2,minmax(80px,1fr));gap:4px;font-size:12px}.catalog-price-grid span{color:var(--muted)}.catalog-actions{display:flex;gap:6px;flex-wrap:wrap}.catalog-actions button{padding:7px 9px;border-radius:9px;font-size:12px}.catalog-status{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:900}.catalog-status.on{background:#dcfce7;color:#166534}.catalog-status.off{background:#fee2e2;color:#991b1b}.catalog-modal{position:fixed;inset:0;background:rgba(17,24,39,.48);display:flex;align-items:center;justify-content:center;z-index:80;padding:14px}.catalog-modal.hidden{display:none}.catalog-modal-card{width:min(920px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:18px;padding:16px;box-shadow:0 24px 80px rgba(0,0,0,.25)}.catalog-form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.catalog-form-grid label{font-size:12px;font-weight:900;color:#374151}.catalog-form-grid input,.catalog-form-grid select,.catalog-form-grid textarea{margin-top:4px}.catalog-form-grid .wide{grid-column:1/-1}.catalog-form-grid textarea{min-height:86px}.catalog-json-help{font-size:12px;color:var(--muted);line-height:1.4;margin-top:4px}.catalog-note{margin-top:10px;color:var(--muted);font-size:13px;line-height:1.45}.catalog-note.bad{color:#991b1b}.catalog-note.good{color:#166534}@media(max-width:980px){.catalog-admin-tools{grid-template-columns:1fr 1fr}.catalog-admin-metrics{grid-template-columns:1fr 1fr}.catalog-table thead{display:none}.catalog-table,.catalog-table tbody,.catalog-table tr,.catalog-table td{display:block;width:100%}.catalog-table tr{border:1px solid var(--line);border-radius:12px;margin:8px 0;padding:8px;background:#fff}.catalog-table td{border:0;padding:6px 0}.catalog-form-grid{grid-template-columns:1fr 1fr}}@media(max-width:620px){.catalog-admin-tools,.catalog-admin-metrics,.catalog-form-grid{grid-template-columns:1fr}.catalog-actions button{flex:1}}';
+    s.textContent = '.catalog-admin-tools{display:grid;grid-template-columns:220px 220px 1fr auto;gap:10px;margin:12px 0}.catalog-admin-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:10px 0 14px}.catalog-admin-metrics>div{background:#f9fafb;border:1px solid var(--line);border-radius:12px;padding:10px}.catalog-admin-metrics span{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}.catalog-admin-metrics b{font-size:16px}.catalog-table{width:100%;border-collapse:collapse}.catalog-table th,.catalog-table td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}.catalog-table th{font-size:12px;color:var(--muted);font-weight:900}.catalog-row-title{font-weight:900;color:#111827}.catalog-row-meta{font-size:12px;color:var(--muted);line-height:1.35;margin-top:3px}.catalog-price-grid{display:grid;grid-template-columns:repeat(2,minmax(80px,1fr));gap:4px;font-size:12px}.catalog-price-grid span{color:var(--muted)}.catalog-actions{display:flex;gap:6px;flex-wrap:wrap}.catalog-actions button{padding:7px 9px;border-radius:9px;font-size:12px}.catalog-status{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:900}.catalog-status.on{background:#dcfce7;color:#166534}.catalog-status.off{background:#fee2e2;color:#991b1b}.catalog-modal{position:fixed;inset:0;background:rgba(17,24,39,.48);display:flex;align-items:center;justify-content:center;z-index:80;padding:14px}.catalog-modal.hidden{display:none}.catalog-modal-card{width:min(920px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:18px;padding:16px;box-shadow:0 24px 80px rgba(0,0,0,.25)}.catalog-form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.catalog-form-grid label{font-size:12px;font-weight:900;color:#374151}.catalog-form-grid input,.catalog-form-grid select,.catalog-form-grid textarea{margin-top:4px}.catalog-form-grid .wide{grid-column:1/-1}.catalog-form-grid textarea{min-height:86px}.catalog-json-help{font-size:12px;color:var(--muted);line-height:1.4;margin-top:4px}.catalog-note{margin-top:10px;color:var(--muted);font-size:13px;line-height:1.45}.catalog-note.bad{color:#991b1b}.catalog-note.good{color:#166534}.catalog-history-list{display:grid;gap:8px;margin-top:10px}.catalog-history-item{border:1px solid var(--line);border-radius:12px;padding:10px;background:#f9fafb}.catalog-history-item b{display:block;margin-bottom:4px}.catalog-history-meta{font-size:12px;color:var(--muted);line-height:1.4}.catalog-history-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px;font-size:12px}.catalog-history-grid div{background:#fff;border:1px solid var(--line);border-radius:9px;padding:7px}.catalog-history-grid span{display:block;color:var(--muted);margin-bottom:2px}@media(max-width:980px){.catalog-admin-tools{grid-template-columns:1fr 1fr}.catalog-admin-metrics{grid-template-columns:1fr 1fr}.catalog-table thead{display:none}.catalog-table,.catalog-table tbody,.catalog-table tr,.catalog-table td{display:block;width:100%}.catalog-table tr{border:1px solid var(--line);border-radius:12px;margin:8px 0;padding:8px;background:#fff}.catalog-table td{border:0;padding:6px 0}.catalog-form-grid{grid-template-columns:1fr 1fr}}@media(max-width:620px){.catalog-admin-tools,.catalog-admin-metrics,.catalog-form-grid,.catalog-history-grid{grid-template-columns:1fr}.catalog-actions button{flex:1}}';
     document.head.appendChild(s);
   }
 
@@ -137,7 +137,7 @@
       '<td><div class="catalog-row-title">'+h(x.name || 'Без названия')+'</div><div class="catalog-row-meta">'+h(x.category || 'Без категории')+' • '+h(x.item_type || 'Тип не указан')+' • '+h(x.unit || 'ед.')+'</div><div class="catalog-row-meta">Режим: '+h(mode)+' • сортировка: '+h(x.sort_order || 0)+'</div></td>' +
       '<td><div class="catalog-price-grid"><div><span>Себ.</span><b>'+money(x.contractor_price)+'</b></div><div><span>Наценка</span><b>'+h(n(x.markup_percent))+'%</b></div><div><span>Мин.</span><b>'+money(x.min_client_price)+'</b></div><div><span>Клиенту</span><b>'+money(calcClientUnit(x))+'</b></div></div></td>' +
       '<td><span class="catalog-status '+(x.is_active === false ? 'off' : 'on')+'">'+(x.is_active === false ? 'выключена' : 'активна')+'</span><div class="catalog-row-meta">'+h(x.description || '')+'</div></td>' +
-      '<td><div class="catalog-actions"><button data-catalog-action="edit">Редактировать</button><button data-catalog-action="copy">Копия</button><button data-catalog-action="toggle">'+(x.is_active === false ? 'Включить' : 'Выключить')+'</button></div></td>' +
+      '<td><div class="catalog-actions"><button data-catalog-action="edit">Редактировать</button><button data-catalog-action="copy">Копия</button><button data-catalog-action="history">История</button><button data-catalog-action="toggle">'+(x.is_active === false ? 'Включить' : 'Выключить')+'</button></div></td>' +
     '</tr>';
   }
 
@@ -152,19 +152,29 @@
   }
 
   function formHtml(){
-    return '<div id="catalogModal" class="catalog-modal hidden"><div class="catalog-modal-card"><div class="card-head"><div><h2 id="catalogModalTitle">Позиция номенклатуры</h2><p>Цены отсюда используются в расчёте и быстрых шаблонах.</p></div><button id="catalogCloseBtn" type="button">×</button></div><div class="catalog-form-grid"><label>Название<input id="catalogFormName" placeholder="Например: Баннер 440 г/м²"></label><label>Категория<input id="catalogFormCategory" placeholder="Например: Наружная реклама"></label><label>Тип<select id="catalogFormType"><option>Изготовление</option><option>Услуга</option><option>Дизайн</option><option>Монтаж</option><option>Доставка</option><option>Интернет-реклама</option><option>Карты и справочники</option><option>Контент</option><option>Материал</option><option>Другое</option></select></label><label>Ед. измерения<select id="catalogFormUnit"><option>шт</option><option>м²</option><option>м</option><option>проект</option><option>час</option><option>месяц</option><option>комплект</option><option>услуга</option><option>заказ</option></select></label><label>Себестоимость / подрядчик<input id="catalogFormCost" type="number" min="0" step="1" value="0"></label><label>Наценка, %<input id="catalogFormMarkup" type="number" step="1" value="50"></label><label>Минимальная цена клиенту<input id="catalogFormMin" type="number" min="0" step="1" value="0"></label><label>Цена клиенту по умолчанию<input id="catalogFormDefault" type="number" min="0" step="1" value="0"></label><label>Режим расчёта<select id="catalogFormMode"><option value="markup">markup — себестоимость + наценка</option><option value="fixed">fixed — фиксированная цена</option><option value="area">area — по площади</option><option value="custom">custom — расширенный</option></select></label><label>Сортировка<input id="catalogFormSort" type="number" step="1" value="100"></label><label>Активность<select id="catalogFormActive"><option value="true">Активна</option><option value="false">Выключена</option></select></label><label class="wide">Описание<textarea id="catalogFormDescription" placeholder="Комментарий для менеджера, подрядчик, особенности материала"></textarea></label><label class="wide">JSON-настройки<textarea id="catalogFormSettings" placeholder="{}"></textarea><div class="catalog-json-help">Для м² можно использовать: {&quot;calc_ui&quot;:&quot;area&quot;,&quot;cost_rules&quot;:{&quot;min_billable_area_m2&quot;:1,&quot;waste_percent&quot;:5}}</div></label></div><div id="catalogFormNote" class="catalog-note"></div><div class="actions right"><button id="catalogCancelBtn" type="button">Отмена</button><button id="catalogSaveBtn" type="button" class="primary">Сохранить</button></div></div></div>';
+    return '<div id="catalogModal" class="catalog-modal hidden"><div class="catalog-modal-card"><div class="card-head"><div><h2 id="catalogModalTitle">Позиция номенклатуры</h2><p>Цены отсюда используются в расчёте и быстрых шаблонах.</p></div><button id="catalogCloseBtn" type="button">×</button></div><div class="catalog-form-grid"><label>Название<input id="catalogFormName" placeholder="Например: Баннер 440 г/м²"></label><label>Категория<input id="catalogFormCategory" placeholder="Например: Наружная реклама"></label><label>Тип<select id="catalogFormType"><option>Изготовление</option><option>Услуга</option><option>Дизайн</option><option>Монтаж</option><option>Доставка</option><option>Интернет-реклама</option><option>Карты и справочники</option><option>Контент</option><option>Материал</option><option>Другое</option></select></label><label>Ед. измерения<select id="catalogFormUnit"><option>шт</option><option>м²</option><option>м</option><option>проект</option><option>час</option><option>месяц</option><option>комплект</option><option>услуга</option><option>заказ</option></select></label><label>Себестоимость / подрядчик<input id="catalogFormCost" type="number" min="0" step="1" value="0"></label><label>Наценка, %<input id="catalogFormMarkup" type="number" step="1" value="50"></label><label>Минимальная цена клиенту<input id="catalogFormMin" type="number" min="0" step="1" value="0"></label><label>Цена клиенту по умолчанию<input id="catalogFormDefault" type="number" min="0" step="1" value="0"></label><label>Режим расчёта<select id="catalogFormMode"><option value="markup">markup — себестоимость + наценка</option><option value="fixed">fixed — фиксированная цена</option><option value="area">area — по площади</option><option value="custom">custom — расширенный</option></select></label><label>Сортировка<input id="catalogFormSort" type="number" step="1" value="100"></label><label>Активность<select id="catalogFormActive"><option value="true">Активна</option><option value="false">Выключена</option></select></label><label class="wide">Причина изменения<input id="catalogFormReason" placeholder="Например: обновился прайс подрядчика, акция, исправление ошибки"></label><label class="wide">Описание<textarea id="catalogFormDescription" placeholder="Комментарий для менеджера, подрядчик, особенности материала"></textarea></label><label class="wide">JSON-настройки<textarea id="catalogFormSettings" placeholder="{}"></textarea><div class="catalog-json-help">Для м² можно использовать: {&quot;calc_ui&quot;:&quot;area&quot;,&quot;cost_rules&quot;:{&quot;min_billable_area_m2&quot;:1,&quot;waste_percent&quot;:5}}</div></label></div><div id="catalogFormNote" class="catalog-note"></div><div class="actions right"><button id="catalogCancelBtn" type="button">Отмена</button><button id="catalogSaveBtn" type="button" class="primary">Сохранить</button></div></div></div>';
+  }
+
+  function historyHtml(){
+    return '<div id="catalogHistoryModal" class="catalog-modal hidden"><div class="catalog-modal-card"><div class="card-head"><div><h2 id="catalogHistoryTitle">История изменений</h2><p>Последние изменения цены, наценки, минималки и статуса позиции.</p></div><button id="catalogHistoryCloseBtn" type="button">×</button></div><div id="catalogHistoryList" class="catalog-history-list"></div><div class="actions right"><button id="catalogHistoryOkBtn" type="button">Закрыть</button></div></div></div>';
   }
 
   function ensureModal(){
-    if(e('catalogModal')) return;
-    document.body.insertAdjacentHTML('beforeend', formHtml());
-    e('catalogCloseBtn').onclick = closeModal;
-    e('catalogCancelBtn').onclick = closeModal;
-    e('catalogSaveBtn').onclick = function(){ save().catch(function(err){ setFormNote(err.message || String(err), 'bad'); }); };
-    e('catalogFormMode').addEventListener('change', function(){
-      var settings = e('catalogFormSettings');
-      if(settings && !String(settings.value || '').trim()) settings.value = JSON.stringify(defaultSettings(this.value), null, 2);
-    });
+    if(!e('catalogModal')){
+      document.body.insertAdjacentHTML('beforeend', formHtml());
+      e('catalogCloseBtn').onclick = closeModal;
+      e('catalogCancelBtn').onclick = closeModal;
+      e('catalogSaveBtn').onclick = function(){ save().catch(function(err){ setFormNote(err.message || String(err), 'bad'); }); };
+      e('catalogFormMode').addEventListener('change', function(){
+        var settings = e('catalogFormSettings');
+        if(settings && !String(settings.value || '').trim()) settings.value = JSON.stringify(defaultSettings(this.value), null, 2);
+      });
+    }
+    if(!e('catalogHistoryModal')){
+      document.body.insertAdjacentHTML('beforeend', historyHtml());
+      e('catalogHistoryCloseBtn').onclick = closeHistory;
+      e('catalogHistoryOkBtn').onclick = closeHistory;
+    }
   }
 
   function setFormNote(text, cls){
@@ -187,6 +197,7 @@
     e('catalogFormMode').value = item ? (item.calculation_mode || 'markup') : 'markup';
     e('catalogFormSort').value = item ? n(item.sort_order) : 100;
     e('catalogFormActive').value = item && item.is_active === false ? 'false' : 'true';
+    e('catalogFormReason').value = '';
     e('catalogFormDescription').value = item ? (item.description || '') : '';
     e('catalogFormSettings').value = item && item.settings ? JSON.stringify(item.settings, null, 2) : JSON.stringify(defaultSettings(item && item.calculation_mode ? item.calculation_mode : 'markup'), null, 2);
     setFormNote('', '');
@@ -196,6 +207,10 @@
   function closeModal(){
     if(e('catalogModal')) e('catalogModal').classList.add('hidden');
     editingId = null;
+  }
+
+  function closeHistory(){
+    if(e('catalogHistoryModal')) e('catalogHistoryModal').classList.add('hidden');
   }
 
   function payload(){
@@ -218,9 +233,64 @@
     };
   }
 
+  function snapshot(x){
+    x = x || {};
+    return {
+      name:x.name || null,
+      category:x.category || null,
+      unit:x.unit || null,
+      item_type:x.item_type || null,
+      contractor_price:n(x.contractor_price),
+      markup_percent:n(x.markup_percent),
+      min_client_price:n(x.min_client_price),
+      default_client_price:n(x.default_client_price),
+      calculation_mode:x.calculation_mode || null,
+      is_active:x.is_active !== false,
+      description:x.description || null,
+      settings:x.settings || {}
+    };
+  }
+
+  function priceChanged(oldItem, p){
+    if(!oldItem) return true;
+    return n(oldItem.contractor_price) !== n(p.contractor_price) ||
+      n(oldItem.markup_percent) !== n(p.markup_percent) ||
+      n(oldItem.min_client_price) !== n(p.min_client_price) ||
+      n(oldItem.default_client_price) !== n(p.default_client_price) ||
+      String(oldItem.calculation_mode || '') !== String(p.calculation_mode || '') ||
+      (oldItem.is_active !== false) !== (p.is_active !== false);
+  }
+
+  async function writeLog(catalogId, oldItem, newItem, changeType, reason){
+    if(!catalogId) return;
+    var log = {
+      catalog_id: catalogId,
+      change_type: changeType || 'price_update',
+      reason: reason || null,
+      old_contractor_price: oldItem ? n(oldItem.contractor_price) : null,
+      new_contractor_price: newItem ? n(newItem.contractor_price) : null,
+      old_markup_percent: oldItem ? n(oldItem.markup_percent) : null,
+      new_markup_percent: newItem ? n(newItem.markup_percent) : null,
+      old_min_client_price: oldItem ? n(oldItem.min_client_price) : null,
+      new_min_client_price: newItem ? n(newItem.min_client_price) : null,
+      old_default_client_price: oldItem ? n(oldItem.default_client_price) : null,
+      new_default_client_price: newItem ? n(newItem.default_client_price) : null,
+      old_calculation_mode: oldItem ? (oldItem.calculation_mode || null) : null,
+      new_calculation_mode: newItem ? (newItem.calculation_mode || null) : null,
+      old_is_active: oldItem ? oldItem.is_active !== false : null,
+      new_is_active: newItem ? newItem.is_active !== false : null,
+      old_values: snapshot(oldItem),
+      new_values: snapshot(newItem)
+    };
+    var r = await window.db.from('leader_catalog_price_logs').insert(log).select('id').single();
+    if(r.error) throw new Error(r.error.message);
+  }
+
   async function save(){
     await needLogin();
     var p = payload();
+    var reason = val('catalogFormReason');
+    var oldItem = editingId ? (catalog.find(function(x){ return String(x.id) === String(editingId); }) || null) : null;
     setFormNote('Сохраняю...', '');
     var r;
     if(editingId){
@@ -229,6 +299,10 @@
       r = await window.db.from('leader_catalog').insert(p).select('id').single();
     }
     if(r.error) throw new Error(r.error.message);
+    var savedId = editingId || (r.data && r.data.id);
+    if(!editingId || priceChanged(oldItem, p)){
+      writeLog(savedId, oldItem, p, editingId ? 'price_update' : 'create', reason).catch(function(err){ console.warn('Catalog price log failed:', err); });
+    }
     closeModal();
     loaded = false;
     await load(true);
@@ -239,11 +313,41 @@
     var item = catalog.find(function(x){ return String(x.id) === String(id); });
     if(!item) return;
     await needLogin();
-    var r = await window.db.from('leader_catalog').update({ is_active: item.is_active === false }).eq('id', id).select('id').single();
+    var newActive = item.is_active === false;
+    var r = await window.db.from('leader_catalog').update({ is_active: newActive }).eq('id', id).select('id').single();
     if(r.error) throw new Error(r.error.message);
-    item.is_active = item.is_active === false;
+    var newItem = Object.assign({}, item, { is_active:newActive });
+    writeLog(id, item, newItem, 'status_update', newActive ? 'Позиция включена' : 'Позиция выключена').catch(function(err){ console.warn('Catalog status log failed:', err); });
+    item.is_active = newActive;
     render();
     toast(item.is_active === false ? 'Позиция выключена' : 'Позиция включена');
+  }
+
+  function histVal(v, isMoney){
+    if(v === null || v === undefined || v === '') return '—';
+    return isMoney ? money(v) : h(v);
+  }
+
+  function historyRow(x){
+    var dt = x.created_at ? new Date(x.created_at).toLocaleString('ru-RU') : '—';
+    return '<div class="catalog-history-item"><b>'+h(x.change_type || 'изменение')+'</b><div class="catalog-history-meta">'+h(dt)+' • '+h(x.changed_by_email || 'пользователь не указан')+(x.reason ? ' • '+h(x.reason) : '')+'</div><div class="catalog-history-grid"><div><span>Себестоимость</span>'+histVal(x.old_contractor_price,true)+' → <b>'+histVal(x.new_contractor_price,true)+'</b></div><div><span>Наценка</span>'+histVal(x.old_markup_percent,false)+'% → <b>'+histVal(x.new_markup_percent,false)+'%</b></div><div><span>Минимум</span>'+histVal(x.old_min_client_price,true)+' → <b>'+histVal(x.new_min_client_price,true)+'</b></div><div><span>Цена по умолчанию</span>'+histVal(x.old_default_client_price,true)+' → <b>'+histVal(x.new_default_client_price,true)+'</b></div><div><span>Режим</span>'+histVal(x.old_calculation_mode,false)+' → <b>'+histVal(x.new_calculation_mode,false)+'</b></div><div><span>Активность</span>'+histVal(x.old_is_active === null ? null : (x.old_is_active ? 'активна' : 'выключена'),false)+' → <b>'+histVal(x.new_is_active === null ? null : (x.new_is_active ? 'активна' : 'выключена'),false)+'</b></div></div></div>';
+  }
+
+  async function showHistory(id){
+    ensureModal();
+    var item = catalog.find(function(x){ return String(x.id) === String(id); });
+    e('catalogHistoryTitle').textContent = 'История: ' + (item ? item.name : 'позиция');
+    e('catalogHistoryList').innerHTML = '<div class="empty">Загружаю историю...</div>';
+    e('catalogHistoryModal').classList.remove('hidden');
+    try{
+      await needLogin();
+      var r = await window.db.from('leader_catalog_price_logs').select('id,created_at,changed_by_email,change_type,reason,old_contractor_price,new_contractor_price,old_markup_percent,new_markup_percent,old_min_client_price,new_min_client_price,old_default_client_price,new_default_client_price,old_calculation_mode,new_calculation_mode,old_is_active,new_is_active').eq('catalog_id', id).order('created_at',{ascending:false}).limit(20);
+      if(r.error) throw new Error(r.error.message);
+      var rows = r.data || [];
+      e('catalogHistoryList').innerHTML = rows.length ? rows.map(historyRow).join('') : '<div class="empty">Истории изменений пока нет.</div>';
+    }catch(err){
+      e('catalogHistoryList').innerHTML = '<div class="empty">Не удалось загрузить историю: '+h(err.message || err)+'</div>';
+    }
   }
 
   function bind(){
@@ -267,6 +371,7 @@
         var item = catalog.find(function(x){ return String(x.id) === String(id); });
         if(btn.dataset.catalogAction === 'edit') openModal(item, false);
         if(btn.dataset.catalogAction === 'copy') openModal(item, true);
+        if(btn.dataset.catalogAction === 'history') showHistory(id);
         if(btn.dataset.catalogAction === 'toggle') toggle(id).catch(function(err){ alert(err.message || err); });
       });
     }
