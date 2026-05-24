@@ -7,7 +7,7 @@
       document.body.appendChild(s);
     }
   }
-  var v='?v=20260524-11';
+  var v='?v=20260524-12';
   loadScript('assets/app-v2-speed-core.js'+v);
   loadScript('assets/app-v2-dashboard.js'+v);
   loadScript('assets/app-v2-orders-pro.js'+v);
