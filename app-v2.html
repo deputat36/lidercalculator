@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/supabase-bridge.js"></script>
 <link rel="stylesheet" href="assets/app-v2.css">
+<style>.guide-link{display:inline-flex;align-items:center;justify-content:center;margin-top:10px;padding:10px 14px;border-radius:999px;background:#f6c343;color:#111827;text-decoration:none;font-weight:900}.guide-card{background:#fff7d6;border:1px solid #fde68a;color:#5a3b00}.guide-card a{font-weight:900;color:#111827}</style>
 </head>
 <body>
 <div id="app" class="app">
@@ -15,6 +16,7 @@
     <div>
       <h1>РА «Лидер» — рабочая CRM</h1>
       <p>Заявки, расчёты, заказы, дизайн, услуги и производство в одном понятном процессе.</p>
+      <a class="guide-link" href="admin-guide.html" target="_blank" rel="noopener">Инструкция администратора</a>
     </div>
     <div class="auth-card">
       <div id="authState" class="auth-state warn">Проверяю вход...</div>
@@ -43,6 +45,15 @@
         <div class="card stat"><span>Заявки в работе</span><b id="statWorkLeads">0</b></div>
         <div class="card stat"><span>Заявки ждут ответ</span><b id="statWaitingLeads">0</b></div>
         <div class="card stat"><span>Заявки переведены в заказ</span><b id="statConvertedLeads">0</b></div>
+      </div>
+      <div class="card guide-card">
+        <div class="card-head">
+          <div>
+            <h2>Инструкция для администратора</h2>
+            <p>Порядок обработки заявок, вопросы клиенту, статусы CRM и готовые фразы для общения.</p>
+          </div>
+          <a class="guide-link" href="admin-guide.html" target="_blank" rel="noopener">Открыть инструкцию</a>
+        </div>
       </div>
       <div class="card">
         <div class="card-head">
