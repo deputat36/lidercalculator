@@ -7,7 +7,7 @@
       document.body.appendChild(s);
     }
   }
-  var v='?v=20260524-3';
+  var v='?v=20260524-4';
   loadScript('assets/app-v2-speed-core.js'+v);
   loadScript('assets/app-v2-dashboard.js'+v);
   loadScript('assets/app-v2-orders-pro.js'+v);
@@ -18,5 +18,6 @@
   loadScript('assets/app-v2-calc'+'-editor.js'+v);
   loadScript('assets/app-v2-calc'+'-summary.js'+v);
   loadScript('assets/app-v2-calc'+'-guard.js'+v);
+  loadScript('assets/app-v2-calc'+'-quick.js'+v);
   loadScript('assets/app-v2-order-'+'aler'+'ts.js'+v);
 })();
