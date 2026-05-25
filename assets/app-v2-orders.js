@@ -7,7 +7,7 @@
       document.body.appendChild(s);
     }
   }
-  var v='?v=20260524-17';
+  var v='?v=20260524-18';
   loadScript('assets/app-v2-speed-core.js'+v);
   loadScript('assets/app-v2-dashboard.js'+v);
   loadScript('assets/app-v2-orders-pro.js'+v);
@@ -16,6 +16,8 @@
   loadScript('assets/app-v2-production.js'+v);
   loadScript('assets/app-v2-production-link.js'+v);
   loadScript('assets/app-v2-production-brief.js'+v);
+  loadScript('assets/app-v2-installation.js'+v);
+  loadScript('assets/app-v2-installation-link.js'+v);
   loadScript('assets/app-v2-design-tasks.js'+v);
   loadScript('assets/app-v2-design-link.js'+v);
   loadScript('assets/app-v2-catalog'+'-calc.js'+v);
