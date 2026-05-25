@@ -10,13 +10,14 @@
     if(e('orderProgressCss'))return;
     var s=document.createElement('style');
     s.id='orderProgressCss';
-    s.textContent='.order-progress-box{margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fff}.order-progress-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}.order-progress-title{font-weight:900;font-size:15px}.order-progress-sub{font-size:12px;color:var(--muted);line-height:1.4;margin-top:3px}.order-progress-bar{height:12px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:10px 0}.order-progress-fill{height:100%;background:#111827;border-radius:999px;transition:width .25s ease}.order-progress-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.order-progress-grid div{background:#f9fafb;border:1px solid var(--line);border-radius:12px;padding:9px}.order-progress-grid span{display:block;color:var(--muted);font-size:11px;font-weight:900;margin-bottom:4px}.order-progress-grid b{font-size:13px}.order-progress-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.order-progress-actions button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 11px;font-size:12px;font-weight:900;cursor:pointer}.order-progress-actions .primary{background:#111827;color:#fff}.order-progress-warn{margin-top:8px;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:8px;font-size:12px;line-height:1.4}@media(max-width:720px){.order-progress-grid{grid-template-columns:1fr 1fr}}@media(max-width:480px){.order-progress-grid{grid-template-columns:1fr}.order-progress-actions button{flex:1}}';
+    s.textContent='.order-progress-box{margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fff}.order-progress-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}.order-progress-title{font-weight:900;font-size:15px}.order-progress-sub{font-size:12px;color:var(--muted);line-height:1.4;margin-top:3px}.order-progress-bar{height:12px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:10px 0}.order-progress-fill{height:100%;background:#111827;border-radius:999px;transition:width .25s ease}.order-progress-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.order-progress-grid div{background:#f9fafb;border:1px solid var(--line);border-radius:12px;padding:9px}.order-progress-grid span{display:block;color:var(--muted);font-size:11px;font-weight:900;margin-bottom:4px}.order-progress-grid b{font-size:13px}.order-progress-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.order-progress-actions button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 11px;font-size:12px;font-weight:900;cursor:pointer}.order-progress-actions .primary{background:#111827;color:#fff}.order-progress-warn{margin-top:8px;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:8px;font-size:12px;line-height:1.4}.order-progress-flags{margin-top:8px;color:#6b7280;font-size:12px;line-height:1.45}@media(max-width:720px){.order-progress-grid{grid-template-columns:1fr 1fr}}@media(max-width:480px){.order-progress-grid{grid-template-columns:1fr}.order-progress-actions button{flex:1}}';
     document.head.appendChild(s);
   }
   async function fetchOrder(id){var r=await window.db.from('leader_orders').select('*').eq('id',id).single();if(r.error)throw new Error(r.error.message);return r.data}
   async function fetchPayments(id){var r=await window.db.from('leader_payments').select('*').eq('order_id',id);return r.error?[]:(r.data||[])}
   async function fetchDesign(id){var r=await window.db.from('leader_design_tasks').select('*').eq('order_id',id);return r.error?[]:(r.data||[])}
   async function fetchProduction(id){var r=await window.db.from('leader_production_jobs').select('*').eq('order_id',id);return r.error?[]:(r.data||[])}
+  async function fetchInstallation(id){var r=await window.db.from('leader_installation_jobs').select('*').eq('order_id',id);return r.error?[]:(r.data||[])}
   function hasDesign(order,design){
     if(design&&design.length)return true;
     var ls=String(order.layout_status||'').toLowerCase();
@@ -27,10 +28,12 @@
     if(production&&production.length)return true;
     var ps=String(order.production_status||'').toLowerCase();
     var txt=[order.production_comment,order.project_name,order.data&&order.data.order_type].join(' ').toLowerCase();
-    return /производ|печать|баннер|наклей|таблич|вывес|монтаж|плен|плён/.test(ps+' '+txt);
+    return /производ|печать|баннер|наклей|таблич|вывес|плен|плён/.test(ps+' '+txt);
   }
-  function hasMounting(order,production){
-    var txt=[order.production_status,order.production_comment,order.internal_comment,order.public_comment,order.project_name,JSON.stringify(order.data||{})].join(' ').toLowerCase();
+  function hasMounting(order,production,installation){
+    if(installation&&installation.length)return true;
+    if(order.installation_status||order.installation_scheduled_at||order.installation_address)return true;
+    var txt=[order.production_status,order.installation_status,order.production_comment,order.internal_comment,order.public_comment,order.project_name,JSON.stringify(order.data||{})].join(' ').toLowerCase();
     if(/монтаж выполнен|монтаж назначен|монтаж/.test(txt))return true;
     return (production||[]).some(function(j){return /монтаж/.test([j.production_status,j.title,j.technical_task,j.contractor_comment,j.internal_comment].join(' ').toLowerCase())});
   }
@@ -38,11 +41,14 @@
     var p=(payments||[]).reduce(function(a,x){return a+n(x.amount)*(x.payment_type==='Расход'?-1:1)},0);
     return p||n(order.prepayment);
   }
-  function latest(list,field){return (list||[]).some(function(x){return String(x[field]||'')})}
   function statusIn(list,field,values){return (list||[]).some(function(x){return values.indexOf(x[field])>=0})}
-  function calc(order,payments,design,production){
+  function calc(order,payments,design,production,installation){
+    installation=installation||[];
     var total=n(order.client_total), paid=paidAmount(payments,order), balance=Math.max(0,total-paid);
-    var designNeeded=hasDesign(order,design), productionNeeded=hasProduction(order,production), mountingNeeded=hasMounting(order,production);
+    var designNeeded=hasDesign(order,design), productionNeeded=hasProduction(order,production), mountingNeeded=hasMounting(order,production,installation);
+    var installationCreated=installation.length>0;
+    var installationScheduled=statusIn(installation,'install_status',['Назначен','Монтажник получил ТЗ','В пути','Выполняется','Выполнен','Клиент принял','Закрыт']) || !!order.installation_scheduled_at;
+    var installationDone=statusIn(installation,'install_status',['Выполнен','Клиент принял','Закрыт']) || order.installation_status==='Выполнен' || !!order.installation_completed_at;
     var score=0, max=0, stage='Новый заказ', next='Проверить заказ и связаться с клиентом', responsible='Менеджер';
     function step(weight,done){max+=weight;if(done)score+=weight;}
 
@@ -59,8 +65,9 @@
       step(15,statusIn(production,'production_status',['Готов','Получен','Выдан клиенту','Монтаж выполнен']) || ['Готов','Получен','Выдан клиенту','Монтаж выполнен'].indexOf(order.production_status)>=0);
     }
     if(mountingNeeded){
-      step(10,['Монтаж назначен','Монтаж выполнен'].indexOf(order.production_status)>=0 || statusIn(production,'production_status',['Монтаж назначен','Монтаж выполнен']));
-      step(10,order.production_status==='Монтаж выполнен' || statusIn(production,'production_status',['Монтаж выполнен']));
+      step(8,installationCreated || ['Монтаж назначен','Монтаж выполнен'].indexOf(order.production_status)>=0 || statusIn(production,'production_status',['Монтаж назначен','Монтаж выполнен']));
+      step(7,installationScheduled || ['Монтаж назначен','Монтаж выполнен'].indexOf(order.production_status)>=0 || statusIn(production,'production_status',['Монтаж назначен','Монтаж выполнен']));
+      step(10,installationDone || order.production_status==='Монтаж выполнен' || statusIn(production,'production_status',['Монтаж выполнен']));
     }
     step(15,balance<=0 && total>0 || order.payment_status==='Оплачено полностью');
     step(5,['Выдан','Закрыт'].indexOf(order.status)>=0 || !!order.issued_at);
@@ -73,7 +80,9 @@
     else if(designNeeded && !statusIn(design,'task_status',['Готова','Согласована','Передана в производство']) && ['Согласован','Готовый файл'].indexOf(order.layout_status)<0){stage='Макет в работе / на согласовании';next='Проверить статус дизайна или согласовать макет с клиентом';responsible='Дизайнер / менеджер';pct=Math.min(pct,60);}
     else if(productionNeeded && !production.length && ['Передан подрядчику','В работе','Готов','Получен','Выдан клиенту','Монтаж выполнен'].indexOf(order.production_status)<0){stage='Нужно производство';next='Создать производственное задание и отправить ТЗ подрядчику';responsible='Менеджер';pct=Math.min(pct,65);}
     else if(productionNeeded && !statusIn(production,'production_status',['Готов','Получен','Выдан клиенту','Монтаж выполнен']) && ['Готов','Получен','Выдан клиенту','Монтаж выполнен'].indexOf(order.production_status)<0){stage='В производстве';next='Получить статус/готовность от подрядчика';responsible='Подрядчик / менеджер';pct=Math.min(pct,85);}
-    else if(mountingNeeded && !(order.production_status==='Монтаж выполнен' || statusIn(production,'production_status',['Монтаж выполнен']))){stage='Нужен монтаж';next='Назначить монтажника или получить отметку о выполнении монтажа';responsible='Менеджер / монтажник';pct=Math.min(pct,95);}
+    else if(mountingNeeded && !installationCreated){stage='Нужно создать монтаж';next='Создать монтажное задание и передать ТЗ монтажнику';responsible='Менеджер';pct=Math.min(pct,88);}
+    else if(mountingNeeded && !installationScheduled){stage='Монтаж нужно назначить';next='Назначить дату, адрес и монтажника';responsible='Менеджер';pct=Math.min(pct,90);}
+    else if(mountingNeeded && !installationDone){stage='Монтаж назначен / выполняется';next='Получить статус от монтажника или отметить выполнение';responsible='Монтажник / менеджер';pct=Math.min(pct,95);}
     else if(balance>0){stage='Ожидает доплату';next='Получить остаток оплаты '+money(balance);responsible='Менеджер';pct=Math.min(pct,97);}
     else if(['Выдан','Закрыт'].indexOf(order.status)<0 && !order.issued_at){stage='Готов к выдаче / закрытию';next='Выдать заказ клиенту и закрыть заказ';responsible='Менеджер';pct=Math.max(pct,97);}
     else{stage='Заказ завершён';next='Действий не требуется';responsible='CRM';pct=100;}
@@ -83,12 +92,18 @@
     if(order.deadline && new Date(order.deadline).getTime()<now && ['Выдан','Закрыт'].indexOf(order.status)<0)overdue.push('Просрочен общий срок заказа');
     (design||[]).forEach(function(t){if(t.deadline && new Date(t.deadline).getTime()<now && ['Готова','Согласована','Передана в производство','Отменена'].indexOf(t.task_status)<0)overdue.push('Просрочена дизайн-задача: '+(t.title||'без названия'))});
     (production||[]).forEach(function(j){if(j.deadline && new Date(j.deadline).getTime()<now && ['Готов','Получен','Выдан клиенту','Монтаж выполнен','Отменён'].indexOf(j.production_status)<0)overdue.push('Просрочено производство: '+(j.title||'без названия'))});
+    (installation||[]).forEach(function(j){if(j.scheduled_at && new Date(j.scheduled_at).getTime()<now && ['Выполнен','Клиент принял','Закрыт','Отменён'].indexOf(j.install_status)<0)overdue.push('Просрочен монтаж: '+(j.title||'без названия'))});
 
-    return {stage:stage,next:next,responsible:responsible,progress:pct,total:total,paid:paid,balance:balance,designNeeded:designNeeded,productionNeeded:productionNeeded,mountingNeeded:mountingNeeded,overdue:overdue};
+    return {stage:stage,next:next,responsible:responsible,progress:pct,total:total,paid:paid,balance:balance,designNeeded:designNeeded,productionNeeded:productionNeeded,mountingNeeded:mountingNeeded,installationCreated:installationCreated,installationScheduled:installationScheduled,installationDone:installationDone,overdue:overdue};
   }
   function renderBox(box,order,result){
     var warn=result.overdue&&result.overdue.length?'<div class="order-progress-warn">'+result.overdue.map(h).join('<br>')+'</div>':'';
-    box.innerHTML='<div class="order-progress-head"><div><div class="order-progress-title">Этап заказа: '+h(result.stage)+'</div><div class="order-progress-sub">Следующий шаг: '+h(result.next)+'</div></div><div><b>'+result.progress+'%</b></div></div><div class="order-progress-bar"><div class="order-progress-fill" style="width:'+result.progress+'%"></div></div><div class="order-progress-grid"><div><span>Ответственный</span><b>'+h(result.responsible)+'</b></div><div><span>Оплачено</span><b>'+money(result.paid)+' / '+money(result.total)+'</b></div><div><span>Остаток</span><b>'+money(result.balance)+'</b></div><div><span>Последний расчёт</span><b>'+dt(order.stage_updated_at)+'</b></div></div>'+warn+'<div class="order-progress-actions"><button class="primary" data-op-action="save">Сохранить этап в заказ</button><button data-op-action="refresh">Пересчитать</button></div>';
+    var flags=[];
+    if(result.designNeeded)flags.push('дизайн');
+    if(result.productionNeeded)flags.push('производство');
+    if(result.mountingNeeded)flags.push('монтаж');
+    var flagHtml=flags.length?'<div class="order-progress-flags">Этапы заказа: '+flags.map(h).join(' → ')+'</div>':'';
+    box.innerHTML='<div class="order-progress-head"><div><div class="order-progress-title">Этап заказа: '+h(result.stage)+'</div><div class="order-progress-sub">Следующий шаг: '+h(result.next)+'</div></div><div><b>'+result.progress+'%</b></div></div><div class="order-progress-bar"><div class="order-progress-fill" style="width:'+result.progress+'%"></div></div><div class="order-progress-grid"><div><span>Ответственный</span><b>'+h(result.responsible)+'</b></div><div><span>Оплачено</span><b>'+money(result.paid)+' / '+money(result.total)+'</b></div><div><span>Остаток</span><b>'+money(result.balance)+'</b></div><div><span>Последний расчёт</span><b>'+dt(order.stage_updated_at)+'</b></div></div>'+flagHtml+warn+'<div class="order-progress-actions"><button class="primary" data-op-action="save">Сохранить этап в заказ</button><button data-op-action="refresh">Пересчитать</button></div>';
   }
   async function build(orderId){
     await needLogin();
@@ -96,7 +111,8 @@
     var payments=await fetchPayments(orderId);
     var design=await fetchDesign(orderId);
     var production=await fetchProduction(orderId);
-    return {order:order,result:calc(order,payments,design,production)};
+    var installation=await fetchInstallation(orderId);
+    return {order:order,result:calc(order,payments,design,production,installation)};
   }
   async function save(orderId,result){
     await needLogin();
