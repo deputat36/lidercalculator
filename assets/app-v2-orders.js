@@ -7,7 +7,7 @@
       document.body.appendChild(s);
     }
   }
-  var v='?v=20260524-19';
+  var v='?v=20260524-20';
   loadScript('assets/app-v2-speed-core.js'+v);
   loadScript('assets/app-v2-dashboard.js'+v);
   loadScript('assets/app-v2-manager-dashboard.js'+v);
@@ -21,6 +21,7 @@
   loadScript('assets/app-v2-installation-link.js'+v);
   loadScript('assets/app-v2-design-tasks.js'+v);
   loadScript('assets/app-v2-design-link.js'+v);
+  loadScript('assets/app-v2-banner-wizard.js'+v);
   loadScript('assets/app-v2-catalog'+'-calc.js'+v);
   loadScript('assets/app-v2-catalog'+'-meta.js'+v);
   loadScript('assets/app-v2-catalog'+'-advanced.js'+v);
