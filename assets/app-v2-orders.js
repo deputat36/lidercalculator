@@ -7,7 +7,7 @@
       document.body.appendChild(s);
     }
   }
-  var v='?v=20260524-23';
+  var v='?v=20260524-24';
   loadScript('assets/app-v2-speed-core.js'+v);
   loadScript('assets/app-v2-dashboard.js'+v);
   loadScript('assets/app-v2-manager-dashboard.js'+v);
@@ -16,6 +16,7 @@
   loadScript('assets/app-v2-order'+'-progress.js'+v);
   loadScript('assets/app-v2-order'+'-finance.js'+v);
   loadScript('assets/app-v2-order'+'-timeline.js'+v);
+  loadScript('assets/app-v2-process-guard.js'+v);
   loadScript('assets/app-v2-production.js'+v);
   loadScript('assets/app-v2-production-link.js'+v);
   loadScript('assets/app-v2-production-brief.js'+v);
