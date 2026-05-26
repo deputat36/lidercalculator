@@ -52,10 +52,4 @@
   loadScript('assets/app-v2-calc'+'-quick.js'+v);
 
   loadScript('assets/app-v2-order-'+'aler'+'ts.js'+v);
-})();  loadScript('assets/app-v2-calc'+'-cost-engine.js'+v);
-  loadScript('assets/app-v2-calc'+'-editor.js'+v);
-  loadScript('assets/app-v2-calc'+'-summary.js'+v);
-  loadScript('assets/app-v2-calc'+'-guard.js'+v);
-  loadScript('assets/app-v2-calc'+'-quick.js'+v);
-  loadScript('assets/app-v2-order-'+'aler'+'ts.js'+v);
 })();
