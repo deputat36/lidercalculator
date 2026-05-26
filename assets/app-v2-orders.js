@@ -7,10 +7,11 @@
       document.body.appendChild(s);
     }
   }
-  var v='?v=20260524-24';
+  var v='?v=20260524-25';
   loadScript('assets/app-v2-speed-core.js'+v);
   loadScript('assets/app-v2-dashboard.js'+v);
   loadScript('assets/app-v2-manager-dashboard.js'+v);
+  loadScript('assets/app-v2-maintenance.js'+v);
   loadScript('assets/app-v2-orders-pro.js'+v);
   loadScript('assets/app-v2-order'+'-card.js'+v);
   loadScript('assets/app-v2-order'+'-progress.js'+v);
