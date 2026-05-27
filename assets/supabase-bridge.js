@@ -43,12 +43,13 @@ window.LEADER_SUPABASE_AUTH_STORAGE = 'leader_session_v1';
           });
           if(refreshed.error){ clearSession(skey); return null; }
           s = buildSession(refreshed.data);
+          if(!s || !s.access_token){ clearSession(skey); return null; }
           saveSession(skey, s);
         }
         return s;
       }
       function buildSession(data){
-        if(!data) return null;
+        if(!data || !data.access_token) return null;
         return {
           access_token:data.access_token,
           refresh_token:data.refresh_token,
@@ -116,14 +117,24 @@ window.LEADER_SUPABASE_AUTH_STORAGE = 'leader_session_v1';
           getUser: async function(){
             var s = await currentSession();
             if(!s) return { data:{ user:null }, error:null };
+            if(s.user) return { data:{ user:s.user }, error:null };
             var r = await fetchJson(url + '/auth/v1/user', { method:'GET', headers: await authHeaders() });
             return r.error ? { data:{ user:null }, error:r.error } : { data:{ user:r.data }, error:null };
           },
           signInWithPassword: async function(creds){
             var r = await fetchJson(url + '/auth/v1/token?grant_type=password', { method:'POST', headers:baseHeaders, body:JSON.stringify({ email:creds.email, password:creds.password }) });
             if(r.error) return { data:{ user:null, session:null }, error:r.error };
-            var session = buildSession(r.data); saveSession(skey, session);
-            return { data:{ user:session.user, session:session }, error:null };
+            var session = buildSession(r.data);
+            if(!session || !session.access_token){
+              clearSession(skey);
+              return { data:{ user:null, session:null }, error:errObj('Supabase не вернул сессию. Проверьте email, пароль и доступность Auth API.', r.status || 0) };
+            }
+            if(!session.user){
+              var userResponse = await fetchJson(url + '/auth/v1/user', { method:'GET', headers:Object.assign({}, baseHeaders, { Authorization:'Bearer ' + session.access_token }) });
+              if(!userResponse.error && userResponse.data) session.user = userResponse.data;
+            }
+            saveSession(skey, session);
+            return { data:{ user:session.user || null, session:session }, error:null };
           },
           signOut: async function(){ clearSession(skey); return { error:null }; },
           onAuthStateChange: function(){ return { data:{ subscription:{ unsubscribe:function(){} } } }; }
