@@ -8,9 +8,11 @@
     }
   }
 
-  var v='?v=20260524-27';
+  var v='?v=20260524-29';
 
   loadScript('assets/app-v2-speed-core.js'+v);
+  loadScript('assets/app-v2-leads-stable.js'+v);
+  loadScript('assets/app-v2-auth-soft.js'+v);
   loadScript('assets/app-v2-dashboard.js'+v);
   loadScript('assets/app-v2-manager-dashboard.js'+v);
   loadScript('assets/app-v2-maintenance.js'+v);
