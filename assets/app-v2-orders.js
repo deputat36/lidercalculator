@@ -8,11 +8,15 @@
     }
   }
 
-  var v='?v=20260524-29';
+  var v='?v=20260524-30';
+  var stableCrm = !!window.LeaderV2CrmStable;
 
-  loadScript('assets/app-v2-speed-core.js'+v);
-  loadScript('assets/app-v2-leads-stable.js'+v);
-  loadScript('assets/app-v2-auth-soft.js'+v);
+  if(!stableCrm){
+    loadScript('assets/app-v2-speed-core.js'+v);
+    loadScript('assets/app-v2-leads-stable.js'+v);
+    loadScript('assets/app-v2-auth-soft.js'+v);
+  }
+
   loadScript('assets/app-v2-dashboard.js'+v);
   loadScript('assets/app-v2-manager-dashboard.js'+v);
   loadScript('assets/app-v2-maintenance.js'+v);
