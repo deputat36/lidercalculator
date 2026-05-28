@@ -10,6 +10,21 @@
 <body>
 <div id="leadViewRoot">Загрузка карточки заявки...</div>
 <script src="assets/supabase-bridge.js?v=20260524-2"></script>
-<script src="assets/lead-view.js?v=20260524-2"></script>
+<script>
+(function(){
+  var root=document.getElementById('leadViewRoot');
+  var params=new URLSearchParams(location.search);
+  var id=params.get('id')||'';
+  var uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if(!uuid.test(id)){
+    root.className='leadv3';
+    root.innerHTML='<header class="leadv3-top"><div><h1>Заявка v3</h1><p>Заявка → потребность → расчёт → КП → заказ.</p></div><div class="leadv3-actions"><a class="leadv3-btn" href="app-v2-novpn.html">Вернуться в CRM</a></div></header><section class="leadv3-page active"><div class="leadv3-card"><h2>Нужно открыть реальную заявку</h2><p class="muted">В адресе страницы не передан настоящий id заявки. Сейчас указано: <b>'+String(id||'пусто').replace(/[&<>\"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]})+'</b></p><p class="muted">Откройте CRM, перейдите в раздел «Заявки» и нажмите кнопку <b>Открыть v3</b> у нужной заявки. В адресе должен быть UUID вида <code>xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code>.</p><a class="leadv3-btn primary" href="app-v2-novpn.html">Открыть CRM</a></div></section>';
+    return;
+  }
+  var s=document.createElement('script');
+  s.src='assets/lead-view.js?v=20260524-3';
+  document.body.appendChild(s);
+})();
+</script>
 </body>
 </html>
