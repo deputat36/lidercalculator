@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>РА Лидер — CRM v4</title>
 <meta name="theme-color" content="#0f172a">
-<link rel="stylesheet" href="assets/v4/styles.css?v=20260528-2">
+<link rel="stylesheet" href="assets/v4/styles.css?v=20260528-3">
 </head>
 <body>
 <div class="v4-shell">
@@ -13,7 +13,7 @@
     <div>
       <p class="v4-kicker">CRM v4 · отдельная чистая версия</p>
       <h1>РА «Лидер» — CRM v4</h1>
-      <p class="v4-subtitle">Второй этап: стабильный вход и список заявок из существующей Supabase-базы.</p>
+      <p class="v4-subtitle">Третий этап: стабильный вход, список заявок и карточка заявки.</p>
     </div>
     <section class="v4-auth-card" aria-label="Авторизация">
       <div id="authStatus" class="v4-status is-warn">Проверяю вход</div>
@@ -49,7 +49,13 @@
       </dl>
     </section>
 
-    <section class="v4-card v4-leads-section" aria-label="Заявки">
+    <section id="leadCardSection" class="v4-card v4-lead-card-section hidden" aria-label="Карточка заявки">
+      <div id="leadCardContent">
+        <div class="v4-empty">Выберите заявку из списка.</div>
+      </div>
+    </section>
+
+    <section id="leadsSection" class="v4-card v4-leads-section" aria-label="Заявки">
       <div class="v4-section-head">
         <div>
           <h2>Заявки</h2>
@@ -82,12 +88,14 @@
 
     <section class="v4-card v4-next-card">
       <h2>Следующий этап</h2>
-      <p>После проверки списка заявок добавим карточку заявки, потребности, расчеты и КП отдельными этапами.</p>
+      <p>После проверки карточки заявки добавим несколько потребностей, расчеты и КП отдельными этапами.</p>
     </section>
   </main>
 </div>
 <div id="toast" class="v4-toast" role="status" aria-live="polite"></div>
-<script type="module" src="assets/v4/auth.js?v=20260528-2"></script>
-<script type="module" src="assets/v4/leads.js?v=20260528-1"></script>
+<script type="module" src="assets/v4/router.js?v=20260528-1"></script>
+<script type="module" src="assets/v4/auth.js?v=20260528-3"></script>
+<script type="module" src="assets/v4/leads.js?v=20260528-2"></script>
+<script type="module" src="assets/v4/lead-card.js?v=20260528-1"></script>
 </body>
 </html>

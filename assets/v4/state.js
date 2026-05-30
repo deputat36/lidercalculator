@@ -6,6 +6,9 @@ export const v4State = {
   authBusy: false,
   crmReady: false,
   status: 'Проверяю вход',
+  route: {
+    leadId: null
+  },
   leads: [],
   leadsLoaded: false,
   leadsBusy: false,
@@ -14,7 +17,10 @@ export const v4State = {
     status: 'active',
     source: 'Все',
     search: ''
-  }
+  },
+  currentLead: null,
+  currentLeadBusy: false,
+  currentLeadError: null
 };
 
 const subscribers = new Set();
@@ -26,6 +32,10 @@ export function setState(patch) {
 
 export function setLeadFilters(patch) {
   setState({ leadFilters: { ...v4State.leadFilters, ...patch } });
+}
+
+export function setRoute(patch) {
+  setState({ route: { ...v4State.route, ...patch } });
 }
 
 export function subscribeState(subscriber) {
@@ -42,6 +52,9 @@ export function resetAuthState() {
     authBusy: false,
     crmReady: false,
     status: 'Нужен вход',
+    route: {
+      leadId: null
+    },
     leads: [],
     leadsLoaded: false,
     leadsBusy: false,
@@ -50,6 +63,9 @@ export function resetAuthState() {
       status: 'active',
       source: 'Все',
       search: ''
-    }
+    },
+    currentLead: null,
+    currentLeadBusy: false,
+    currentLeadError: null
   });
 }
