@@ -29,6 +29,10 @@ async function loadProfileInBackground(user) {
   }
 }
 
+function emitCrmReady() {
+  document.dispatchEvent(new CustomEvent('leader-v4:crm-ready', { detail: { state: v4State } }));
+}
+
 function openCrm(session, statusText = 'CRM готова') {
   setState({
     session,
@@ -39,6 +43,7 @@ function openCrm(session, statusText = 'CRM готова') {
   showLoggedIn(session.user);
   setStatus(statusText, 'good');
   loadProfileInBackground(session.user);
+  emitCrmReady();
 }
 
 export async function checkAuth() {
