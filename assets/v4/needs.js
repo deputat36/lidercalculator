@@ -10,19 +10,6 @@ function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 }
 
-function formatDate(value) {
-  if (!value) return '';
-  try {
-    return new Date(value).toLocaleDateString('ru-RU');
-  } catch (_) {
-    return String(value);
-  }
-}
-
-function dataValue(need, key) {
-  return need?.structured_data && typeof need.structured_data === 'object' ? need.structured_data[key] : '';
-}
-
 function typeOptions(selected = 'Другое') {
   return NEED_TYPES.map((type) => `<option ${type === selected ? 'selected' : ''}>${esc(type)}</option>`).join('');
 }
@@ -34,7 +21,7 @@ function calculateCompleteness(payload) {
   if (payload.description) score += 15; else missing.push('Описание');
   if (payload.need_type && payload.need_type !== 'Другое') score += 10;
   const structured = payload.structured_data || {};
-  if (structured.width || structured.format || structured.print_run || structured.quantity) score += 15; else missing.push('Размер / формат / количество');
+  if (structured.width || structured.height || structured.print_run || structured.quantity) score += 15; else missing.push('Размер / формат / количество');
   if (structured.material) score += 10; else missing.push('Материал');
   if (payload.deadline_text || payload.deadline_date) score += 10; else missing.push('Срок');
   if (payload.need_installation && !structured.installation_address) missing.push('Адрес монтажа');
@@ -67,7 +54,7 @@ function renderNeedCard(need) {
         ${missing.length ? `<div class="v4-need-missing">Не хватает: ${missing.map(esc).join(', ')}</div>` : ''}
       </div>
       <div class="v4-need-actions">
-        <button type="button" data-action="archive">В архив</button>
+        <button type="button" data-action="archive-need">В архив</button>
       </div>
     </article>
   `;
@@ -282,6 +269,9 @@ function bindNeedsEvents() {
     } finally {
       button.disabled = false;
     }
+  });
+  document.addEventListener('leader-v4:lead-card-rendered', () => {
+    renderNeeds();
   });
   document.addEventListener('leader-v4:route-change', (event) => {
     const id = event.detail?.leadId || null;
