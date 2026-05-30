@@ -2,6 +2,7 @@ import { supabaseClient } from './supabase-client.js';
 import { timeout, friendlyError } from './api.js';
 import { v4State, setState, setLeadFilters } from './state.js';
 import { byId, setStatus, toast } from './ui.js';
+import { openLeadRoute } from './router.js';
 
 const LEAD_FIELDS = 'id,created_at,name,phone,source,service,message,status,lead_quality,estimated_amount,next_contact_at,page_url,budget,city,converted_order_id,converted_client_id';
 const ACTIVE_HIDDEN_STATUSES = new Set(['Спам']);
@@ -98,7 +99,6 @@ function statusClass(status) {
 
 function renderLeadCard(lead) {
   const phone = phoneHref(lead.phone);
-  const openHref = `app-v4.html?lead=${encodeURIComponent(lead.id)}`;
   return `
     <article class="v4-lead-card" data-id="${esc(lead.id)}">
       <div class="v4-lead-main">
@@ -120,7 +120,7 @@ function renderLeadCard(lead) {
       </div>
       <div class="v4-lead-actions">
         ${phone ? `<a href="${esc(phone)}">Позвонить</a>` : ''}
-        <a href="${esc(openHref)}">Открыть</a>
+        <button type="button" data-action="open">Открыть</button>
         <button type="button" data-action="work">В работу</button>
       </div>
     </article>
@@ -223,19 +223,25 @@ function bindLeadEvents() {
     renderLeads();
   });
   byId('leadsList')?.addEventListener('click', async (event) => {
-    const button = event.target.closest('button[data-action="work"]');
+    const button = event.target.closest('button[data-action]');
     if (!button) return;
     const card = button.closest('.v4-lead-card');
     const id = card?.dataset.id;
     if (!id) return;
-    button.disabled = true;
-    try {
-      await updateLeadStatus(id, 'В работе');
-      toast('Заявка переведена в работу');
-    } catch (error) {
-      toast(friendlyError(error));
-    } finally {
-      button.disabled = false;
+    if (button.dataset.action === 'open') {
+      openLeadRoute(id);
+      return;
+    }
+    if (button.dataset.action === 'work') {
+      button.disabled = true;
+      try {
+        await updateLeadStatus(id, 'В работе');
+        toast('Заявка переведена в работу');
+      } catch (error) {
+        toast(friendlyError(error));
+      } finally {
+        button.disabled = false;
+      }
     }
   });
 }
