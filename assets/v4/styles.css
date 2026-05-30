@@ -125,6 +125,9 @@ margin-top:22px}
 .v4-card h2{
 margin:0 0 8px;
 font-size:24px}
+.v4-card h3{
+margin:0 0 8px;
+font-size:18px}
 .v4-card p{
 margin:0;
 color:var(--muted);
@@ -134,23 +137,23 @@ display:grid;
 grid-template-columns:repeat(4,minmax(0,1fr));
 gap:10px;
 margin:18px 0 0}
-.v4-profile-grid div,.v4-lead-stats div{
+.v4-profile-grid div,.v4-lead-stats div,.v4-detail-grid div{
 background:var(--bg);
 border:1px solid var(--line);
 border-radius:16px;
 padding:12px}
-.v4-profile-grid dt,.v4-lead-stats span{
+.v4-profile-grid dt,.v4-lead-stats span,.v4-detail-grid dt{
 color:var(--muted);
 font-size:12px;
 font-weight:900;
 text-transform:uppercase}
-.v4-profile-grid dd{
+.v4-profile-grid dd,.v4-detail-grid dd{
 margin:5px 0 0;
 font-weight:900;
 overflow-wrap:anywhere}
 .v4-next-card{
 background:var(--soft)}
-.v4-section-head{
+.v4-section-head,.v4-card-view-head{
 display:flex;
 justify-content:space-between;
 gap:14px;
@@ -224,7 +227,7 @@ color:#334155!important}
 display:grid;
 gap:8px;
 align-content:start}
-.v4-lead-actions a,.v4-lead-actions button{
+.v4-lead-actions a,.v4-lead-actions button,.v4-card-view-actions a,.v4-card-view-actions button{
 text-align:center;
 text-decoration:none;
 border:1px solid var(--line);
@@ -233,10 +236,33 @@ padding:10px 11px;
 font-weight:900;
 color:var(--text);
 background:#fff}
-.v4-lead-actions a:nth-child(2){
+.v4-lead-actions button[data-action="open"],.v4-card-view-actions .v4-primary{
 background:var(--primary);
 border-color:var(--primary);
 color:#fff}
+.v4-lead-card-view{
+display:grid;
+gap:16px}
+.v4-card-view-actions{
+display:flex;
+flex-wrap:wrap;
+gap:8px;
+justify-content:flex-end}
+.v4-detail-grid{
+display:grid;
+grid-template-columns:repeat(4,minmax(0,1fr));
+gap:10px}
+.v4-subcard{
+border:1px solid var(--line);
+border-radius:18px;
+background:#fff;
+padding:16px}
+.v4-subcard p{
+white-space:pre-wrap;
+color:#334155}
+.v4-subcard a{
+color:var(--primary);
+font-weight:900}
 .v4-empty{
 border:1px dashed var(--line);
 border-radius:18px;
@@ -270,19 +296,21 @@ display:none!important}
 @media(max-width:850px){
 .v4-shell{
 padding:18px}
-.v4-hero,.v4-workspace,.v4-filters,.v4-lead-card{
+.v4-hero,.v4-workspace,.v4-filters,.v4-lead-card,.v4-detail-grid{
 grid-template-columns:1fr}
 .v4-hero h1{
 font-size:34px}
 .v4-profile-grid,.v4-lead-stats{
 grid-template-columns:1fr 1fr}
-.v4-user-panel,.v4-section-head{
+.v4-user-panel,.v4-section-head,.v4-card-view-head{
 align-items:stretch;
 flex-direction:column}
-.v4-lead-actions{
+.v4-lead-actions,.v4-card-view-actions{
 grid-template-columns:1fr 1fr}
+.v4-card-view-actions{
+justify-content:stretch}
 }
 @media(max-width:520px){
-.v4-profile-grid,.v4-lead-stats,.v4-lead-actions{
+.v4-profile-grid,.v4-lead-stats,.v4-lead-actions,.v4-card-view-actions{
 grid-template-columns:1fr}
 }
