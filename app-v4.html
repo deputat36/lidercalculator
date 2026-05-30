@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>РА Лидер — CRM v4</title>
 <meta name="theme-color" content="#0f172a">
-<link rel="stylesheet" href="assets/v4/styles.css?v=20260528-1">
+<link rel="stylesheet" href="assets/v4/styles.css?v=20260528-2">
 </head>
 <body>
 <div class="v4-shell">
@@ -13,7 +13,7 @@
     <div>
       <p class="v4-kicker">CRM v4 · отдельная чистая версия</p>
       <h1>РА «Лидер» — CRM v4</h1>
-      <p class="v4-subtitle">Первый этап: стабильный вход через существующий Supabase без заявок, расчётов, КП и заказов.</p>
+      <p class="v4-subtitle">Второй этап: стабильный вход и список заявок из существующей Supabase-базы.</p>
     </div>
     <section class="v4-auth-card" aria-label="Авторизация">
       <div id="authStatus" class="v4-status is-warn">Проверяю вход</div>
@@ -48,13 +48,46 @@
         <div><dt>Статус</dt><dd id="profileActive">—</dd></div>
       </dl>
     </section>
+
+    <section class="v4-card v4-leads-section" aria-label="Заявки">
+      <div class="v4-section-head">
+        <div>
+          <h2>Заявки</h2>
+          <p>Последние 50 заявок. Расчеты, КП и заказы будут добавлены следующими этапами.</p>
+        </div>
+        <button id="reloadLeadsBtn" type="button" class="v4-primary">Обновить заявки</button>
+      </div>
+      <div class="v4-lead-stats">
+        <div><span>Всего</span><b id="v4StatAllLeads">0</b></div>
+        <div><span>Новые</span><b id="v4StatNewLeads">0</b></div>
+        <div><span>В работе</span><b id="v4StatWorkLeads">0</b></div>
+        <div><span>Ждут ответ</span><b id="v4StatWaitingLeads">0</b></div>
+      </div>
+      <div class="v4-filters">
+        <label>Статус
+          <select id="leadStatusFilter"></select>
+        </label>
+        <label>Источник
+          <select id="leadSourceFilter"><option>Все</option></select>
+        </label>
+        <label>Поиск
+          <input id="leadSearch" type="search" placeholder="Имя, телефон, услуга, комментарий">
+        </label>
+      </div>
+      <div id="leadsCounter" class="v4-muted">Заявки еще не загружены</div>
+      <div id="leadsList" class="v4-leads-list">
+        <div class="v4-empty">После входа заявки загрузятся автоматически.</div>
+      </div>
+    </section>
+
     <section class="v4-card v4-next-card">
       <h2>Следующий этап</h2>
-      <p>Заявки, расчёты, КП и заказы будут подключены отдельными модулями после стабилизации авторизации.</p>
+      <p>После проверки списка заявок добавим карточку заявки, потребности, расчеты и КП отдельными этапами.</p>
     </section>
   </main>
 </div>
 <div id="toast" class="v4-toast" role="status" aria-live="polite"></div>
-<script type="module" src="assets/v4/auth.js?v=20260528-1"></script>
+<script type="module" src="assets/v4/auth.js?v=20260528-2"></script>
+<script type="module" src="assets/v4/leads.js?v=20260528-1"></script>
 </body>
 </html>
