@@ -3,7 +3,7 @@ import { timeout, friendlyError } from './api.js';
 import { v4State, setState } from './state.js';
 import { byId, setStatus, toast } from './ui.js';
 
-const NEED_FIELDS = 'id,lead_id,client_id,need_type,title,description,structured_data,need_design,need_installation,design_reason,installation_reason,deadline_text,deadline_date,files,status,completeness_score,missing_fields,created_at,updated_at';
+const NEED_FIELDS = 'id,lead_id,client_id,need_type,title,description,structured_data,need_design,need_installation,design_reason,installation_reason,deadline_text,deadline_date,files,status,completeness_score,missing_fields,created_by,updated_by,created_at,updated_at';
 const NEED_TYPES = ['Баннер', 'Вывеска', 'Пленка / наклейки', 'Полиграфия', 'Табличка', 'Дизайн', 'Монтаж', 'Интернет-реклама', 'Другое'];
 
 function esc(value) {
@@ -124,7 +124,7 @@ export function renderNeeds() {
   } else if (!v4State.leadNeeds.length) {
     list.innerHTML = '<div class="v4-empty">Потребности пока не добавлены. Зафиксируйте, что именно нужно клиенту.</div>';
   } else {
-    list.innerHTML = v4State.leadNeeds.map(renderNeedCard).join('');
+    list.innerHTML = v4State.leadNeeds.filter((need) => need.status !== 'Архив').map(renderNeedCard).join('') || '<div class="v4-empty">Все потребности отправлены в архив.</div>';
   }
   if (!formBox.dataset.ready) {
     formBox.innerHTML = renderNeedForm();
@@ -174,6 +174,7 @@ function readNeedForm() {
   };
   const payload = {
     lead_id: v4State.route.leadId,
+    client_id: v4State.currentLead?.converted_client_id || null,
     need_type: byId('needType')?.value || 'Другое',
     title: byId('needTitle')?.value.trim() || '',
     description: byId('needDescription')?.value.trim() || '',
@@ -183,7 +184,10 @@ function readNeedForm() {
     design_reason: byId('needDesignReason')?.value.trim() || null,
     installation_reason: byId('needInstallationReason')?.value.trim() || null,
     deadline_text: byId('needDeadline')?.value.trim() || null,
-    status: 'Черновик'
+    files: [],
+    status: 'Черновик',
+    created_by: v4State.user?.id || null,
+    updated_by: v4State.user?.id || null
   };
   const completeness = calculateCompleteness(payload);
   payload.completeness_score = completeness.score;
@@ -226,7 +230,7 @@ async function archiveNeed(id) {
   const response = await timeout(
     supabaseClient
       .from('leader_lead_needs')
-      .update({ status: 'Архив', updated_at: new Date().toISOString() })
+      .update({ status: 'Архив', updated_by: v4State.user?.id || null, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select(NEED_FIELDS)
       .single(),
