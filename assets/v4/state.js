@@ -20,7 +20,10 @@ export const v4State = {
   },
   currentLead: null,
   currentLeadBusy: false,
-  currentLeadError: null
+  currentLeadError: null,
+  leadNeeds: [],
+  leadNeedsBusy: false,
+  leadNeedsError: null
 };
 
 const subscribers = new Set();
@@ -66,6 +69,9 @@ export function resetAuthState() {
     },
     currentLead: null,
     currentLeadBusy: false,
-    currentLeadError: null
+    currentLeadError: null,
+    leadNeeds: [],
+    leadNeedsBusy: false,
+    leadNeedsError: null
   });
 }
