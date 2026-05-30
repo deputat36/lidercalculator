@@ -23,7 +23,10 @@ export const v4State = {
   currentLeadError: null,
   leadNeeds: [],
   leadNeedsBusy: false,
-  leadNeedsError: null
+  leadNeedsError: null,
+  calculations: [],
+  calculationsBusy: false,
+  calculationsError: null
 };
 
 const subscribers = new Set();
@@ -72,6 +75,9 @@ export function resetAuthState() {
     currentLeadError: null,
     leadNeeds: [],
     leadNeedsBusy: false,
-    leadNeedsError: null
+    leadNeedsError: null,
+    calculations: [],
+    calculationsBusy: false,
+    calculationsError: null
   });
 }
