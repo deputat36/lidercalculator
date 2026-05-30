@@ -77,16 +77,26 @@ function encode(value) {
   return encodeURIComponent(value);
 }
 
+function preferHeader(values) {
+  return values.filter(Boolean).join(',');
+}
+
 class QueryBuilder {
   constructor(table) {
     this.table = table;
     this.columns = '*';
     this.filters = [];
+    this.orders = [];
+    this.limitCount = null;
     this.singleMode = false;
+    this.method = 'GET';
+    this.body = null;
+    this.prefer = [];
   }
 
   select(columns = '*') {
     this.columns = columns;
+    if (this.method !== 'GET' && !this.prefer.includes('return=representation')) this.prefer.push('return=representation');
     return this;
   }
 
@@ -95,23 +105,57 @@ class QueryBuilder {
     return this;
   }
 
+  order(column, options = {}) {
+    this.orders.push(`${column}.${options.ascending === false ? 'desc' : 'asc'}`);
+    return this;
+  }
+
+  limit(count) {
+    this.limitCount = count;
+    return this;
+  }
+
   maybeSingle() {
     this.singleMode = true;
     return this;
   }
 
+  single() {
+    this.singleMode = true;
+    return this;
+  }
+
+  insert(body) {
+    this.method = 'POST';
+    this.body = body;
+    if (!this.prefer.includes('return=representation')) this.prefer.push('return=representation');
+    return this;
+  }
+
+  update(body) {
+    this.method = 'PATCH';
+    this.body = body;
+    if (!this.prefer.includes('return=representation')) this.prefer.push('return=representation');
+    return this;
+  }
+
   url() {
-    const query = [`select=${encode(this.columns)}`, ...this.filters].join('&');
-    return `${V4_CONFIG.supabaseUrl}/rest/v1/${this.table}?${query}`;
+    const query = [`select=${encode(this.columns)}`, ...this.filters];
+    if (this.orders.length) query.push(`order=${encode(this.orders.join(','))}`);
+    if (this.limitCount !== null) query.push(`limit=${encode(this.limitCount)}`);
+    return `${V4_CONFIG.supabaseUrl}/rest/v1/${this.table}?${query.join('&')}`;
   }
 
   async execute() {
     try {
       const headers = await authHeaders();
       if (this.singleMode) headers.Accept = 'application/vnd.pgrst.object+json';
+      if (this.prefer.length) headers.Prefer = preferHeader(this.prefer);
+      const options = { method: this.method, headers };
+      if (this.body !== null) options.body = JSON.stringify(this.body);
       const { data, response } = await fetchJson(
         this.url(),
-        { method: 'GET', headers },
+        options,
         V4_CONFIG.timeouts.requestMs,
         'Запрос к Supabase не ответил вовремя'
       );
