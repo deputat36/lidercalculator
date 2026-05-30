@@ -71,6 +71,23 @@ function renderLeadDetails(lead) {
         <p>${esc(lead.message || 'Сообщение не заполнено.')}</p>
       </section>
 
+      <section class="v4-subcard v4-needs-section">
+        <div class="v4-subcard-head">
+          <div>
+            <h3>Потребности клиента</h3>
+            <p>В одной заявке можно зафиксировать несколько задач: баннер, вывеска, плёнка, полиграфия, монтаж и другое.</p>
+          </div>
+          <span id="needsCounter" class="v4-muted">Потребностей: 0</span>
+        </div>
+        <div id="needsList" class="v4-needs-list">
+          <div class="v4-empty">Потребности пока не загружены.</div>
+        </div>
+        <div class="v4-need-form-card">
+          <h4>Добавить потребность</h4>
+          <div id="needFormBox"></div>
+        </div>
+      </section>
+
       <section class="v4-subcard">
         <h3>Ссылки и источник</h3>
         <dl class="v4-detail-grid">
@@ -83,7 +100,7 @@ function renderLeadDetails(lead) {
 
       <section class="v4-subcard">
         <h3>Следующие этапы</h3>
-        <p>Потребности, расчёты, КП и заказ будут добавлены отдельными маленькими этапами после проверки карточки заявки.</p>
+        <p>После фиксации потребностей отдельными этапами будут добавлены расчёты, КП и заказ.</p>
       </section>
 
       ${payloadHtml ? `<section class="v4-subcard"><h3>Технические данные формы</h3><dl class="v4-detail-grid">${payloadHtml}</dl></section>` : ''}
@@ -127,6 +144,7 @@ export function renderCurrentLead() {
     return;
   }
   box.innerHTML = renderLeadDetails(v4State.currentLead);
+  document.dispatchEvent(new CustomEvent('leader-v4:lead-card-rendered', { detail: { leadId: v4State.route.leadId } }));
 }
 
 export async function loadCurrentLead(id = v4State.route.leadId) {
@@ -166,7 +184,7 @@ function bindLeadCardEvents() {
   byId('leadCardSection')?.addEventListener('click', (event) => {
     if (event.target.closest('#backToLeadsBtn')) {
       clearLeadUrl();
-      setState({ currentLead: null, currentLeadError: null, currentLeadBusy: false });
+      setState({ currentLead: null, currentLeadError: null, currentLeadBusy: false, leadNeeds: [], leadNeedsError: null, leadNeedsBusy: false });
       renderCurrentLead();
       return;
     }
@@ -178,7 +196,7 @@ function bindLeadCardEvents() {
     const id = event.detail?.leadId || null;
     if (id) loadCurrentLead(id);
     else {
-      setState({ currentLead: null, currentLeadError: null, currentLeadBusy: false });
+      setState({ currentLead: null, currentLeadError: null, currentLeadBusy: false, leadNeeds: [], leadNeedsError: null, leadNeedsBusy: false });
       renderCurrentLead();
     }
   });
