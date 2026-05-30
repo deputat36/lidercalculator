@@ -9,7 +9,7 @@ const ARCHIVE_STATUSES = new Set(['Спам']);
 const STATUSES = ['Все', 'Новая', 'В работе', 'Уточнение деталей', 'Расчёт подготовлен', 'КП отправлено', 'Ждём ответ', 'Нужно пересчитать', 'Согласовано', 'Создан заказ', 'Отказ', 'Не отвечает', 'Дорого', 'Передумал', 'Спам'];
 
 function esc(value) {
-  return String(value ?? '').replace(/[&<>\"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[m]));
+  return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 }
 
 function formatDate(value) {
@@ -70,7 +70,10 @@ function renderSourceOptions() {
   const current = select.value || v4State.leadFilters.source || 'Все';
   const sources = uniqueSources(v4State.leads);
   select.innerHTML = sources.map((source) => `<option ${source === current ? 'selected' : ''}>${esc(source)}</option>`).join('');
-  if (!sources.includes(current)) select.value = 'Все';
+  if (!sources.includes(current)) {
+    select.value = 'Все';
+    setLeadFilters({ source: 'Все' });
+  }
 }
 
 function renderStatusOptions() {
@@ -241,6 +244,9 @@ export function bootLeads() {
   bindLeadEvents();
   renderLeads();
   document.addEventListener('leader-v4:crm-ready', () => loadLeads({ silent: true }));
+  if (v4State.crmReady && !v4State.leadsLoaded && !v4State.leadsBusy) {
+    loadLeads({ silent: true });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', bootLeads);
