@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>РА Лидер — CRM v4</title>
+<meta name="theme-color" content="#0f172a">
+<link rel="stylesheet" href="assets/v4/styles.css?v=20260528-1">
+</head>
+<body>
+<div class="v4-shell">
+  <header class="v4-hero">
+    <div>
+      <p class="v4-kicker">CRM v4 · отдельная чистая версия</p>
+      <h1>РА «Лидер» — CRM v4</h1>
+      <p class="v4-subtitle">Первый этап: стабильный вход через существующий Supabase без заявок, расчётов, КП и заказов.</p>
+    </div>
+    <section class="v4-auth-card" aria-label="Авторизация">
+      <div id="authStatus" class="v4-status is-warn">Проверяю вход</div>
+      <form id="loginForm" class="v4-login-form" autocomplete="on">
+        <label>Email
+          <input id="loginEmail" name="email" type="email" autocomplete="email" placeholder="manager@example.com" required>
+        </label>
+        <label>Пароль
+          <input id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+        </label>
+        <button id="loginBtn" class="v4-primary" type="submit">Войти</button>
+      </form>
+      <div id="userPanel" class="v4-user-panel hidden">
+        <div>
+          <span class="v4-muted">Пользователь</span>
+          <b id="userEmail">—</b>
+        </div>
+        <button id="logoutBtn" type="button">Выйти / сбросить вход</button>
+      </div>
+      <div id="profileNotice" class="v4-profile-notice hidden" role="status"></div>
+    </section>
+  </header>
+
+  <main id="crmWorkspace" class="v4-workspace hidden">
+    <section class="v4-card">
+      <h2>CRM готова</h2>
+      <p>Сессия активна. Профиль пользователя догружается в фоне и не блокирует работу.</p>
+      <dl class="v4-profile-grid">
+        <div><dt>Email</dt><dd id="profileEmail">—</dd></div>
+        <div><dt>Имя</dt><dd id="profileName">—</dd></div>
+        <div><dt>Роль</dt><dd id="profileRole">—</dd></div>
+        <div><dt>Статус</dt><dd id="profileActive">—</dd></div>
+      </dl>
+    </section>
+    <section class="v4-card v4-next-card">
+      <h2>Следующий этап</h2>
+      <p>Заявки, расчёты, КП и заказы будут подключены отдельными модулями после стабилизации авторизации.</p>
+    </section>
+  </main>
+</div>
+<div id="toast" class="v4-toast" role="status" aria-live="polite"></div>
+<script type="module" src="assets/v4/auth.js?v=20260528-1"></script>
+</body>
+</html>
