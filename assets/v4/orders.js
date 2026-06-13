@@ -206,6 +206,8 @@ async function loadOrderBundle(offerId) {
   if (itemsResponse.error) throw itemsResponse.error;
   const items = itemsResponse.data || [];
   if (!items.length) throw new Error('В расчёте нет позиций');
+  const invalidItems = items.filter((item) => Number(item.qty || 0) <= 0 || Number(item.client_sum || 0) <= 0);
+  if (invalidItems.length) throw new Error('В расчёте есть позиции с нулевым количеством или нулевой суммой клиенту');
 
   let lead = v4State.currentLead;
   if (!lead || lead.id !== calculation.lead_id) {
@@ -247,7 +249,7 @@ function buildRows(items) {
 
 async function updateLinks(bundle, order) {
   const now = new Date().toISOString();
-  const tasks = [
+  const responses = await Promise.all([
     supabaseClient.from('leader_lead_calculations').update({ order_id: order.id, status: 'Создан заказ', updated_at: now }).eq('id', bundle.calculation.id),
     supabaseClient.from('leader_commercial_offers').update({ order_id: order.id, updated_at: now }).eq('id', bundle.offer.id),
     supabaseClient.from('leader_leads').update({ status: 'Создан заказ', converted_order_id: order.id, converted_at: now }).eq('id', bundle.lead.id),
@@ -262,14 +264,25 @@ async function updateLinks(bundle, order) {
       created_by: v4State.user?.id || null,
       created_by_email: v4State.user?.email || null
     })
-  ];
-  return Promise.allSettled(tasks);
+  ]);
+  return responses.filter((response) => response?.error).map((response) => response.error);
+}
+
+function captureOrderForm() {
+  return {
+    offerId: byId('orderOfferId')?.value || '',
+    projectName: byId('orderProjectName')?.value?.trim() || '',
+    orderType: byId('orderType')?.value || 'Смешанный',
+    deadline: byId('orderDeadline')?.value || '',
+    layoutStatus: byId('orderLayoutStatus')?.value || 'Макета нет',
+    comment: byId('orderComment')?.value?.trim() || ''
+  };
 }
 
 async function createOrder() {
   if (createBusy) return;
-  const offerId = byId('orderOfferId')?.value || '';
-  if (!offerId) {
+  const form = captureOrderForm();
+  if (!form.offerId) {
     toast('Выберите согласованное КП');
     return;
   }
@@ -277,9 +290,9 @@ async function createOrder() {
   renderOrders();
   try {
     setStatus('Создаю заказ...', 'warn');
-    const bundle = await loadOrderBundle(offerId);
-    const projectName = byId('orderProjectName')?.value?.trim() || bundle.offer.title || bundle.calculation.title || 'Заказ РА Лидер';
-    const comment = byId('orderComment')?.value?.trim() || bundle.calculation.public_comment || bundle.need?.description || '';
+    const bundle = await loadOrderBundle(form.offerId);
+    const projectName = form.projectName || bundle.offer.title || bundle.calculation.title || 'Заказ РА Лидер';
+    const comment = form.comment || bundle.calculation.public_comment || bundle.need?.description || '';
     const rows = buildRows(bundle.items);
     const totals = {
       cost: Number(bundle.calculation.contractor_cost || 0),
@@ -295,9 +308,9 @@ async function createOrder() {
       client_name: bundle.lead.name || '',
       client_phone: bundle.lead.phone || '',
       source: bundle.lead.source || 'CRM v4',
-      order_type: byId('orderType')?.value || 'Смешанный',
-      deadline: byId('orderDeadline')?.value || bundle.need?.deadline_date || null,
-      layout_status: byId('orderLayoutStatus')?.value || (bundle.need?.need_design ? 'Нужен дизайн' : 'Макета нет'),
+      order_type: form.orderType,
+      deadline: form.deadline || bundle.need?.deadline_date || null,
+      layout_status: form.layoutStatus || (bundle.need?.need_design ? 'Нужен дизайн' : 'Макета нет'),
       comment,
       payment_status: 'Не оплачено',
       rows,
@@ -309,8 +322,7 @@ async function createOrder() {
 
     if (!result.order?.id) throw new Error('CRM не вернула созданный заказ');
     const order = result.order;
-    const linkResults = await updateLinks(bundle, order);
-    const linkWarnings = linkResults.filter((item) => item.status === 'rejected');
+    const linkWarnings = await updateLinks(bundle, order);
 
     orders = [order, ...orders.filter((item) => item.id !== order.id)];
     setState({
