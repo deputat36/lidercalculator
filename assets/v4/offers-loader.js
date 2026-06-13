@@ -1,10 +1,16 @@
 import './offers.js';
+import './orders.js';
 
-const cssId = 'leader-v4-offers-css';
-if (!document.getElementById(cssId)) {
+const styles = [
+  ['leader-v4-offers-css', 'assets/v4/offers.css?v=20260528-1'],
+  ['leader-v4-orders-css', 'assets/v4/orders.css?v=20260613-1']
+];
+
+styles.forEach(([id, href]) => {
+  if (document.getElementById(id)) return;
   const link = document.createElement('link');
-  link.id = cssId;
+  link.id = id;
   link.rel = 'stylesheet';
-  link.href = 'assets/v4/offers.css?v=20260528-1';
+  link.href = href;
   document.head.appendChild(link);
-}
+});
