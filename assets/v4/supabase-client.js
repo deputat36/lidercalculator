@@ -139,6 +139,12 @@ class QueryBuilder {
     return this;
   }
 
+  delete() {
+    this.method = 'DELETE';
+    this.body = null;
+    return this;
+  }
+
   url() {
     const query = [`select=${encode(this.columns)}`, ...this.filters];
     if (this.orders.length) query.push(`order=${encode(this.orders.join(','))}`);
