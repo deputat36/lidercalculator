@@ -14,6 +14,10 @@ function typeOptions(selected = 'Другое') {
   return NEED_TYPES.map((type) => `<option ${type === selected ? 'selected' : ''}>${esc(type)}</option>`).join('');
 }
 
+function emitNeedsLoaded(leadId = v4State.route.leadId) {
+  document.dispatchEvent(new CustomEvent('leader-v4:needs-loaded', { detail: { leadId, needs: v4State.leadNeeds || [] } }));
+}
+
 function calculateCompleteness(payload) {
   let score = 20;
   const missing = [];
@@ -136,6 +140,7 @@ export async function loadNeeds(leadId = v4State.route.leadId) {
   if (!leadId || !v4State.crmReady) {
     setState({ leadNeeds: [], leadNeedsBusy: false, leadNeedsError: null });
     renderNeeds();
+    emitNeedsLoaded(leadId);
     return [];
   }
   setState({ leadNeedsBusy: true, leadNeedsError: null });
@@ -153,11 +158,13 @@ export async function loadNeeds(leadId = v4State.route.leadId) {
     if (response.error) throw response.error;
     setState({ leadNeeds: response.data || [], leadNeedsBusy: false, leadNeedsError: null });
     renderNeeds();
+    emitNeedsLoaded(leadId);
     return response.data || [];
   } catch (error) {
     const message = friendlyError(error);
     setState({ leadNeeds: [], leadNeedsBusy: false, leadNeedsError: message });
     renderNeeds();
+    emitNeedsLoaded(leadId);
     setStatus(`Ошибка потребностей: ${message}`, 'error');
     return [];
   }
@@ -223,6 +230,7 @@ async function createNeed() {
   setState({ leadNeeds: [response.data, ...v4State.leadNeeds] });
   resetNeedForm();
   renderNeeds();
+  emitNeedsLoaded(v4State.route.leadId);
   setStatus('Потребность сохранена', 'good');
 }
 
@@ -240,6 +248,7 @@ async function archiveNeed(id) {
   if (response.error) throw response.error;
   setState({ leadNeeds: v4State.leadNeeds.map((need) => (need.id === id ? response.data : need)) });
   renderNeeds();
+  emitNeedsLoaded(v4State.route.leadId);
 }
 
 function bindNeedsEvents() {
@@ -283,6 +292,7 @@ function bindNeedsEvents() {
     else {
       setState({ leadNeeds: [], leadNeedsBusy: false, leadNeedsError: null });
       renderNeeds();
+      emitNeedsLoaded(null);
     }
   });
   document.addEventListener('leader-v4:crm-ready', () => {

@@ -88,6 +88,10 @@ function renderLeadDetails(lead) {
         </div>
       </section>
 
+      <section id="calculationsBox" class="v4-calculations-host">
+        <div class="v4-empty">Расчёты загрузятся после открытия карточки.</div>
+      </section>
+
       <section class="v4-subcard">
         <h3>Ссылки и источник</h3>
         <dl class="v4-detail-grid">
@@ -100,7 +104,7 @@ function renderLeadDetails(lead) {
 
       <section class="v4-subcard">
         <h3>Следующие этапы</h3>
-        <p>После фиксации потребностей отдельными этапами будут добавлены расчёты, КП и заказ.</p>
+        <p>После проверки расчётов отдельными этапами будут добавлены КП и заказ.</p>
       </section>
 
       ${payloadHtml ? `<section class="v4-subcard"><h3>Технические данные формы</h3><dl class="v4-detail-grid">${payloadHtml}</dl></section>` : ''}
@@ -184,7 +188,7 @@ function bindLeadCardEvents() {
   byId('leadCardSection')?.addEventListener('click', (event) => {
     if (event.target.closest('#backToLeadsBtn')) {
       clearLeadUrl();
-      setState({ currentLead: null, currentLeadError: null, currentLeadBusy: false, leadNeeds: [], leadNeedsError: null, leadNeedsBusy: false });
+      setState({ currentLead: null, currentLeadError: null, currentLeadBusy: false, leadNeeds: [], leadNeedsError: null, leadNeedsBusy: false, calculations: [], calculationsError: null, calculationsBusy: false });
       renderCurrentLead();
       return;
     }
@@ -196,7 +200,7 @@ function bindLeadCardEvents() {
     const id = event.detail?.leadId || null;
     if (id) loadCurrentLead(id);
     else {
-      setState({ currentLead: null, currentLeadError: null, currentLeadBusy: false, leadNeeds: [], leadNeedsError: null, leadNeedsBusy: false });
+      setState({ currentLead: null, currentLeadError: null, currentLeadBusy: false, leadNeeds: [], leadNeedsError: null, leadNeedsBusy: false, calculations: [], calculationsError: null, calculationsBusy: false });
       renderCurrentLead();
     }
   });

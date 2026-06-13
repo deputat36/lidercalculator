@@ -1,0 +1,120 @@
+.v4-calculations-section{
+  display:grid;
+  gap:14px;
+}
+.v4-calculations-list{
+  display:grid;
+  gap:12px;
+}
+.v4-calc-card{
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:#f8fafc;
+  padding:14px;
+}
+.v4-calc-title-row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+}
+.v4-calc-title-row h4{
+  margin:0;
+  font-size:17px;
+}
+.v4-calc-title-row span{
+  white-space:nowrap;
+  border-radius:999px;
+  padding:5px 8px;
+  font-size:12px;
+  font-weight:900;
+  background:#dcfce7;
+  color:var(--good);
+}
+.v4-calc-title-row span.is-warn{
+  background:#fef3c7;
+  color:var(--warn);
+}
+.v4-calc-title-row span.is-error{
+  background:#fee2e2;
+  color:var(--error);
+}
+.v4-calc-totals{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:10px;
+}
+.v4-calc-totals span{
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:#fff;
+  padding:6px 9px;
+  font-size:13px;
+  color:#334155;
+}
+.v4-calc-warnings{
+  margin-top:10px;
+  border-radius:12px;
+  background:#fff7ed;
+  color:#9a3412;
+  padding:8px 10px;
+  font-weight:800;
+  font-size:13px;
+}
+.v4-calc-form{
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:#fff;
+  padding:16px;
+}
+.v4-calc-item-add{
+  margin-top:14px;
+  border-top:1px solid var(--line);
+  padding-top:14px;
+}
+.v4-calc-item-add h4{
+  margin:0 0 12px;
+}
+.v4-table-wrap{
+  width:100%;
+  overflow:auto;
+  margin-top:14px;
+  border:1px solid var(--line);
+  border-radius:16px;
+}
+.v4-table{
+  width:100%;
+  border-collapse:collapse;
+  background:#fff;
+  min-width:720px;
+}
+.v4-table th,.v4-table td{
+  padding:10px;
+  border-bottom:1px solid var(--line);
+  text-align:left;
+  vertical-align:top;
+}
+.v4-table th{
+  background:#f8fafc;
+  color:#334155;
+  font-size:12px;
+  text-transform:uppercase;
+  font-weight:900;
+}
+.v4-table td{
+  color:#334155;
+  font-size:14px;
+}
+.v4-table tr:last-child td{
+  border-bottom:0;
+}
+.v4-table button{
+  padding:6px 10px;
+  border-radius:10px;
+}
+@media(max-width:850px){
+  .v4-calc-title-row{
+    flex-direction:column;
+  }
+}
