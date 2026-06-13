@@ -74,12 +74,22 @@ function totals(items = draftItems) {
   };
 }
 
-function needOptions() {
-  const options = ['<option value="">Общий расчёт по заявке</option>'];
+function needOptions(selectedValue = '') {
+  const options = [`<option value="" ${selectedValue ? '' : 'selected'}>Общий расчёт по заявке</option>`];
   (v4State.leadNeeds || []).filter((need) => need.status !== 'Архив').forEach((need) => {
-    options.push(`<option value="${esc(need.id)}">${esc(need.title || need.need_type || 'Потребность')}</option>`);
+    options.push(`<option value="${esc(need.id)}" ${need.id === selectedValue ? 'selected' : ''}>${esc(need.title || need.need_type || 'Потребность')}</option>`);
   });
   return options.join('');
+}
+
+function refreshNeedSelect() {
+  const select = byId('calcNeedId');
+  if (!select) return;
+  const current = select.value || '';
+  select.innerHTML = needOptions(current);
+  if (current && ![...select.options].some((option) => option.value === current)) {
+    select.value = '';
+  }
 }
 
 function renderCalcCard(calc) {
@@ -335,6 +345,9 @@ function bindCalculationEvents() {
     }
   });
   document.addEventListener('leader-v4:lead-card-rendered', () => renderCalculations());
+  document.addEventListener('leader-v4:needs-loaded', (event) => {
+    if (event.detail?.leadId === v4State.route.leadId) refreshNeedSelect();
+  });
   document.addEventListener('leader-v4:route-change', (event) => {
     const id = event.detail?.leadId || null;
     draftItems = [];
