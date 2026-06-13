@@ -3,6 +3,7 @@ import { timeout, friendlyError } from './api.js';
 import { v4State, setState } from './state.js';
 import { byId, setStatus, toast } from './ui.js';
 import { clearLeadUrl } from './router.js';
+import './offers-loader.js';
 
 const FULL_LEAD_FIELDS = 'id,name,phone,source,message,page_url,status,payload,created_at,updated_at,service,contact_preference,city,budget,utm_source,utm_medium,utm_campaign,utm_content,utm_term,assigned_to,converted_order_id,converted_client_id,last_contact_at,next_contact_at,converted_at,reject_reason,lead_quality,estimated_amount';
 
