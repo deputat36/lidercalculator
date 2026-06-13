@@ -3,6 +3,7 @@ import { timeout, friendlyError } from './api.js';
 import { v4State, setState } from './state.js';
 import { byId, setStatus, toast } from './ui.js';
 import { clearLeadUrl } from './router.js';
+import './offers-loader.js';
 
 const FULL_LEAD_FIELDS = 'id,name,phone,source,message,page_url,status,payload,created_at,updated_at,service,contact_preference,city,budget,utm_source,utm_medium,utm_campaign,utm_content,utm_term,assigned_to,converted_order_id,converted_client_id,last_contact_at,next_contact_at,converted_at,reject_reason,lead_quality,estimated_amount';
 
@@ -92,6 +93,10 @@ function renderLeadDetails(lead) {
         <div class="v4-empty">Расчёты загрузятся после открытия карточки.</div>
       </section>
 
+      <section id="offersBox" class="v4-offers-host">
+        <div class="v4-empty">Коммерческие предложения загрузятся после открытия карточки.</div>
+      </section>
+
       <section class="v4-subcard">
         <h3>Ссылки и источник</h3>
         <dl class="v4-detail-grid">
@@ -103,8 +108,8 @@ function renderLeadDetails(lead) {
       </section>
 
       <section class="v4-subcard">
-        <h3>Следующие этапы</h3>
-        <p>После проверки расчётов отдельными этапами будут добавлены КП и заказ.</p>
+        <h3>Следующий этап</h3>
+        <p>После проверки коммерческих предложений будет добавлено создание заказа из согласованного расчёта.</p>
       </section>
 
       ${payloadHtml ? `<section class="v4-subcard"><h3>Технические данные формы</h3><dl class="v4-detail-grid">${payloadHtml}</dl></section>` : ''}
@@ -184,11 +189,28 @@ export async function loadCurrentLead(id = v4State.route.leadId) {
   }
 }
 
+function clearLeadModules() {
+  setState({
+    currentLead: null,
+    currentLeadError: null,
+    currentLeadBusy: false,
+    leadNeeds: [],
+    leadNeedsError: null,
+    leadNeedsBusy: false,
+    calculations: [],
+    calculationsError: null,
+    calculationsBusy: false,
+    offers: [],
+    offersError: null,
+    offersBusy: false
+  });
+}
+
 function bindLeadCardEvents() {
   byId('leadCardSection')?.addEventListener('click', (event) => {
     if (event.target.closest('#backToLeadsBtn')) {
       clearLeadUrl();
-      setState({ currentLead: null, currentLeadError: null, currentLeadBusy: false, leadNeeds: [], leadNeedsError: null, leadNeedsBusy: false, calculations: [], calculationsError: null, calculationsBusy: false });
+      clearLeadModules();
       renderCurrentLead();
       return;
     }
@@ -200,7 +222,7 @@ function bindLeadCardEvents() {
     const id = event.detail?.leadId || null;
     if (id) loadCurrentLead(id);
     else {
-      setState({ currentLead: null, currentLeadError: null, currentLeadBusy: false, leadNeeds: [], leadNeedsError: null, leadNeedsBusy: false, calculations: [], calculationsError: null, calculationsBusy: false });
+      clearLeadModules();
       renderCurrentLead();
     }
   });
