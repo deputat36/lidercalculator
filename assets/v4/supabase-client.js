@@ -146,9 +146,9 @@ class QueryBuilder {
   }
 
   url() {
-    const query = [`select=${encode(this.columns)}`, ...this.filters];
-    if (this.orders.length) query.push(`order=${encode(this.orders.join(','))}`);
-    if (this.limitCount !== null) query.push(`limit=${encode(this.limitCount)}`);
+    const query = this.method === 'DELETE' ? [...this.filters] : [`select=${encode(this.columns)}`, ...this.filters];
+    if (this.orders.length && this.method !== 'DELETE') query.push(`order=${encode(this.orders.join(','))}`);
+    if (this.limitCount !== null && this.method !== 'DELETE') query.push(`limit=${encode(this.limitCount)}`);
     return `${V4_CONFIG.supabaseUrl}/rest/v1/${this.table}?${query.join('&')}`;
   }
 
