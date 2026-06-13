@@ -92,6 +92,10 @@ function renderLeadDetails(lead) {
         <div class="v4-empty">Расчёты загрузятся после открытия карточки.</div>
       </section>
 
+      <section id="offersBox" class="v4-offers-host">
+        <div class="v4-empty">Коммерческие предложения загрузятся после открытия карточки.</div>
+      </section>
+
       <section class="v4-subcard">
         <h3>Ссылки и источник</h3>
         <dl class="v4-detail-grid">
@@ -103,8 +107,8 @@ function renderLeadDetails(lead) {
       </section>
 
       <section class="v4-subcard">
-        <h3>Следующие этапы</h3>
-        <p>После проверки расчётов отдельными этапами будут добавлены КП и заказ.</p>
+        <h3>Следующий этап</h3>
+        <p>После проверки коммерческих предложений будет добавлено создание заказа из согласованного расчёта.</p>
       </section>
 
       ${payloadHtml ? `<section class="v4-subcard"><h3>Технические данные формы</h3><dl class="v4-detail-grid">${payloadHtml}</dl></section>` : ''}
@@ -184,11 +188,28 @@ export async function loadCurrentLead(id = v4State.route.leadId) {
   }
 }
 
+function clearLeadModules() {
+  setState({
+    currentLead: null,
+    currentLeadError: null,
+    currentLeadBusy: false,
+    leadNeeds: [],
+    leadNeedsError: null,
+    leadNeedsBusy: false,
+    calculations: [],
+    calculationsError: null,
+    calculationsBusy: false,
+    offers: [],
+    offersError: null,
+    offersBusy: false
+  });
+}
+
 function bindLeadCardEvents() {
   byId('leadCardSection')?.addEventListener('click', (event) => {
     if (event.target.closest('#backToLeadsBtn')) {
       clearLeadUrl();
-      setState({ currentLead: null, currentLeadError: null, currentLeadBusy: false, leadNeeds: [], leadNeedsError: null, leadNeedsBusy: false, calculations: [], calculationsError: null, calculationsBusy: false });
+      clearLeadModules();
       renderCurrentLead();
       return;
     }
@@ -200,7 +221,7 @@ function bindLeadCardEvents() {
     const id = event.detail?.leadId || null;
     if (id) loadCurrentLead(id);
     else {
-      setState({ currentLead: null, currentLeadError: null, currentLeadBusy: false, leadNeeds: [], leadNeedsError: null, leadNeedsBusy: false, calculations: [], calculationsError: null, calculationsBusy: false });
+      clearLeadModules();
       renderCurrentLead();
     }
   });
