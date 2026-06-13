@@ -6,6 +6,7 @@ import { byId, setStatus, toast } from './ui.js';
 const CALC_FIELDS = 'id,lead_id,need_id,client_id,title,status,version_number,client_total,contractor_cost,profit,margin_percent,warning_level,warnings,public_comment,internal_comment,commercial_offer_id,order_id,created_by,updated_by,created_at,updated_at';
 const ITEM_FIELDS = 'id,calculation_id,lead_id,catalog_id,category,item_type,name,unit,qty,contractor_price,contractor_sum,markup_percent,client_price,client_sum,profit,margin_percent,comment,data,sort_order,created_at,updated_at';
 let draftItems = [];
+let saveBusy = false;
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
@@ -271,8 +272,21 @@ function addDraftItem() {
   renderDraftItems();
 }
 
+async function rollbackCalculation(id) {
+  if (!id) return;
+  const rollback = await timeout(
+    supabaseClient
+      .from('leader_lead_calculations')
+      .delete()
+      .eq('id', id),
+    10000,
+    'Не удалось откатить пустой расчёт'
+  );
+  if (rollback.error) throw rollback.error;
+}
+
 async function saveCalculation() {
-  if (!v4State.route.leadId) return;
+  if (!v4State.route.leadId || saveBusy) return;
   const result = totals();
   if (!result.items.length) {
     toast('Добавьте хотя бы одну позицию расчёта');
@@ -296,6 +310,10 @@ async function saveCalculation() {
     created_by: v4State.user?.id || null,
     updated_by: v4State.user?.id || null
   };
+  let createdCalculationId = null;
+  saveBusy = true;
+  const saveButton = byId('saveCalculationBtn');
+  if (saveButton) saveButton.disabled = true;
   try {
     setStatus('Сохраняю расчёт...', 'warn');
     const calcResponse = await timeout(
@@ -309,6 +327,7 @@ async function saveCalculation() {
     );
     if (calcResponse.error) throw calcResponse.error;
     const calc = calcResponse.data;
+    createdCalculationId = calc.id;
     const itemPayloads = result.items.map((item) => ({ ...item, calculation_id: calc.id, lead_id: v4State.route.leadId }));
     const itemsResponse = await timeout(
       supabaseClient
@@ -325,8 +344,19 @@ async function saveCalculation() {
     setStatus('Расчёт сохранён', 'good');
     toast('Расчёт сохранён');
   } catch (error) {
+    if (createdCalculationId) {
+      try {
+        await rollbackCalculation(createdCalculationId);
+      } catch (rollbackError) {
+        console.error('CRM v4 calculation rollback failed:', rollbackError);
+      }
+    }
     toast(friendlyError(error));
     setStatus(`Ошибка сохранения расчёта: ${friendlyError(error)}`, 'error');
+  } finally {
+    saveBusy = false;
+    const currentSaveButton = byId('saveCalculationBtn');
+    if (currentSaveButton) currentSaveButton.disabled = false;
   }
 }
 
