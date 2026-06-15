@@ -10,30 +10,57 @@ export function timeout(promise, ms = V4_CONFIG.timeouts.requestMs, message = '�
 
 export function isNetworkError(error) {
   const text = String(error?.message || error || '').toLowerCase();
-  return text.includes('failed to fetch') || text.includes('network') || text.includes('timeout') || text.includes('ожид');
+  return text.includes('failed to fetch')
+    || text.includes('network')
+    || text.includes('timeout')
+    || text.includes('ожид')
+    || error?.name === 'AbortError';
 }
 
 export function friendlyError(error) {
-  return isNetworkError(error) ? 'Ошибка сети' : (error?.message || String(error || 'Ошибка'));
+  return isNetworkError(error) ? 'Ошибка сети. Проверьте соединение и повторите действие.' : (error?.message || String(error || 'Ошибка'));
 }
 
 export async function fetchJson(url, options = {}, timeoutMs = V4_CONFIG.timeouts.requestMs, timeoutMessage = 'Сервер долго не отвечает') {
-  const response = await timeout(fetch(url, options), timeoutMs, timeoutMessage);
-  const raw = await response.text();
-  let data = null;
-  if (raw) {
-    try {
-      data = JSON.parse(raw);
-    } catch (_) {
-      data = raw;
+  const controller = new AbortController();
+  const externalSignal = options.signal;
+  let timer = null;
+  let externalAbortHandler = null;
+
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else {
+      externalAbortHandler = () => controller.abort();
+      externalSignal.addEventListener('abort', externalAbortHandler, { once: true });
     }
   }
-  if (!response.ok) {
-    const message = data?.error_description || data?.msg || data?.message || `HTTP ${response.status}`;
-    const error = new Error(message);
-    error.status = response.status;
-    error.data = data;
+
+  timer = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    const raw = await response.text();
+    let data = null;
+    if (raw) {
+      try {
+        data = JSON.parse(raw);
+      } catch (_) {
+        data = raw;
+      }
+    }
+    if (!response.ok) {
+      const message = data?.error_description || data?.msg || data?.message || `HTTP ${response.status}`;
+      const error = new Error(message);
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+    return { data, response };
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error(timeoutMessage);
     throw error;
+  } finally {
+    window.clearTimeout(timer);
+    if (externalSignal && externalAbortHandler) externalSignal.removeEventListener('abort', externalAbortHandler);
   }
-  return { data, response };
 }
