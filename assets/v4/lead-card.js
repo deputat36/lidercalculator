@@ -7,6 +7,9 @@ import './offers-loader.js';
 
 const FULL_LEAD_FIELDS = 'id,name,phone,source,message,page_url,status,payload,created_at,updated_at,service,contact_preference,city,budget,utm_source,utm_medium,utm_campaign,utm_content,utm_term,assigned_to,converted_order_id,converted_client_id,last_contact_at,next_contact_at,converted_at,reject_reason,lead_quality,estimated_amount';
 
+let leadLoadPromise = null;
+let leadLoadId = null;
+
 function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 }
@@ -108,8 +111,8 @@ function renderLeadDetails(lead) {
       </section>
 
       <section class="v4-subcard">
-        <h3>Следующий этап</h3>
-        <p>После проверки коммерческих предложений будет добавлено создание заказа из согласованного расчёта.</p>
+        <h3>Рабочий путь</h3>
+        <p>Заявка → потребность → расчёт → коммерческое предложение → согласование → заказ.</p>
       </section>
 
       ${payloadHtml ? `<section class="v4-subcard"><h3>Технические данные формы</h3><dl class="v4-detail-grid">${payloadHtml}</dl></section>` : ''}
@@ -140,7 +143,7 @@ export function renderCurrentLead() {
     return;
   }
   showLeadCard();
-  if (v4State.currentLeadBusy) {
+  if (v4State.currentLeadBusy && !v4State.currentLead) {
     box.innerHTML = '<div class="v4-empty">Загружаю карточку заявки...</div>';
     return;
   }
@@ -156,40 +159,61 @@ export function renderCurrentLead() {
   document.dispatchEvent(new CustomEvent('leader-v4:lead-card-rendered', { detail: { leadId: v4State.route.leadId } }));
 }
 
-export async function loadCurrentLead(id = v4State.route.leadId) {
+export async function loadCurrentLead(id = v4State.route.leadId, { force = false } = {}) {
   if (!id || !v4State.crmReady) {
     renderCurrentLead();
     return null;
   }
-  setState({ currentLeadBusy: true, currentLeadError: null, currentLead: null });
-  renderCurrentLead();
-  try {
-    setStatus('Загружаю карточку заявки...', 'warn');
-    const response = await timeout(
-      supabaseClient
-        .from('leader_leads')
-        .select(FULL_LEAD_FIELDS)
-        .eq('id', id)
-        .single(),
-      14000,
-      'Карточка заявки не загрузилась за 14 секунд'
-    );
-    if (response.error) throw response.error;
-    if (!response.data) throw new Error('Заявка не найдена');
-    setState({ currentLead: response.data, currentLeadBusy: false, currentLeadError: null });
+
+  if (!force && v4State.currentLead?.id === id && !v4State.currentLeadError) {
     renderCurrentLead();
-    setStatus('Карточка заявки загружена', 'good');
-    return response.data;
-  } catch (error) {
-    const message = friendlyError(error);
-    setState({ currentLead: null, currentLeadBusy: false, currentLeadError: message });
-    renderCurrentLead();
-    setStatus(`Ошибка карточки заявки: ${message}`, 'error');
-    return null;
+    return v4State.currentLead;
   }
+
+  if (!force && leadLoadPromise && leadLoadId === id) return leadLoadPromise;
+
+  leadLoadId = id;
+  leadLoadPromise = (async () => {
+    const keepCurrent = v4State.currentLead?.id === id ? v4State.currentLead : null;
+    setState({ currentLeadBusy: true, currentLeadError: null, currentLead: keepCurrent });
+    renderCurrentLead();
+    try {
+      setStatus('Загружаю карточку заявки...', 'warn');
+      const response = await timeout(
+        supabaseClient
+          .from('leader_leads')
+          .select(FULL_LEAD_FIELDS)
+          .eq('id', id)
+          .single(),
+        28000,
+        'Карточка заявки загружается дольше обычного. Проверьте интернет и повторите обновление.'
+      );
+      if (response.error) throw response.error;
+      if (!response.data) throw new Error('Заявка не найдена');
+      setState({ currentLead: response.data, currentLeadBusy: false, currentLeadError: null });
+      renderCurrentLead();
+      setStatus('Карточка заявки загружена', 'good');
+      return response.data;
+    } catch (error) {
+      const message = friendlyError(error);
+      setState({ currentLead: keepCurrent, currentLeadBusy: false, currentLeadError: keepCurrent ? null : message });
+      renderCurrentLead();
+      setStatus(`Ошибка карточки заявки: ${message}`, 'error');
+      return keepCurrent;
+    } finally {
+      if (leadLoadId === id) {
+        leadLoadPromise = null;
+        leadLoadId = null;
+      }
+    }
+  })();
+
+  return leadLoadPromise;
 }
 
 function clearLeadModules() {
+  leadLoadPromise = null;
+  leadLoadId = null;
   setState({
     currentLead: null,
     currentLeadError: null,
@@ -215,7 +239,7 @@ function bindLeadCardEvents() {
       return;
     }
     if (event.target.closest('#refreshLeadBtn')) {
-      loadCurrentLead().then(() => toast('Карточка обновлена'));
+      loadCurrentLead(v4State.route.leadId, { force: true }).then(() => toast('Карточка обновлена'));
     }
   });
   document.addEventListener('leader-v4:route-change', (event) => {
