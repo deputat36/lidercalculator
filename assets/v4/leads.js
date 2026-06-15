@@ -9,6 +9,8 @@ const ACTIVE_HIDDEN_STATUSES = new Set(['Спам']);
 const ARCHIVE_STATUSES = new Set(['Спам']);
 const STATUSES = ['Все', 'Новая', 'В работе', 'Уточнение деталей', 'Расчёт подготовлен', 'КП отправлено', 'Ждём ответ', 'Нужно пересчитать', 'Согласовано', 'Создан заказ', 'Отказ', 'Не отвечает', 'Дорого', 'Передумал', 'Спам'];
 
+let leadsLoadPromise = null;
+
 function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 }
@@ -135,12 +137,18 @@ export function renderLeads() {
   const counter = byId('leadsCounter');
   if (!list) return;
   const leads = filteredLeads();
-  if (counter) counter.textContent = v4State.leadsLoaded ? `Показано: ${leads.length} из ${v4State.leads.length}` : 'Заявки ещё не загружены';
-  if (v4State.leadsBusy) {
+  if (counter) {
+    counter.textContent = v4State.leadsBusy && v4State.leads.length
+      ? `Обновляю… Показано: ${leads.length} из ${v4State.leads.length}`
+      : v4State.leadsLoaded
+        ? `Показано: ${leads.length} из ${v4State.leads.length}`
+        : 'Заявки ещё не загружены';
+  }
+  if (v4State.leadsBusy && !v4State.leads.length) {
     list.innerHTML = '<div class="v4-empty">Загружаю заявки...</div>';
     return;
   }
-  if (v4State.leadsError) {
+  if (v4State.leadsError && !v4State.leads.length) {
     list.innerHTML = `<div class="v4-empty is-error">${esc(v4State.leadsError)}</div>`;
     return;
   }
@@ -159,36 +167,46 @@ export function renderLeads() {
   list.innerHTML = leads.map(renderLeadCard).join('');
 }
 
-export async function loadLeads({ silent = false } = {}) {
+export async function loadLeads({ silent = false, force = false } = {}) {
   if (!v4State.crmReady) {
     renderLeads();
     return [];
   }
-  setState({ leadsBusy: true, leadsError: null });
-  renderLeads();
-  try {
-    if (!silent) setStatus('Загружаю заявки...', 'warn');
-    const response = await timeout(
-      supabaseClient
-        .from('leader_leads')
-        .select(LEAD_FIELDS)
-        .order('created_at', { ascending: false })
-        .limit(50),
-      14000,
-      'Заявки не загрузились за 14 секунд'
-    );
-    if (response.error) throw response.error;
-    setState({ leads: response.data || [], leadsLoaded: true, leadsBusy: false, leadsError: null });
+
+  if (!force && leadsLoadPromise) return leadsLoadPromise;
+  if (!force && v4State.leadsLoaded && !v4State.leadsError) return v4State.leads;
+
+  leadsLoadPromise = (async () => {
+    setState({ leadsBusy: true, leadsError: null });
     renderLeads();
-    if (!silent) setStatus(`CRM готова. Заявок: ${(response.data || []).length}`, 'good');
-    return response.data || [];
-  } catch (error) {
-    const message = friendlyError(error);
-    setState({ leadsBusy: false, leadsError: message, leadsLoaded: true });
-    renderLeads();
-    setStatus(`Ошибка загрузки заявок: ${message}`, 'error');
-    return [];
-  }
+    try {
+      if (!silent) setStatus('Загружаю заявки...', 'warn');
+      const response = await timeout(
+        supabaseClient
+          .from('leader_leads')
+          .select(LEAD_FIELDS)
+          .order('created_at', { ascending: false })
+          .limit(50),
+        28000,
+        'Заявки загружаются дольше обычного. Проверьте интернет и повторите обновление.'
+      );
+      if (response.error) throw response.error;
+      setState({ leads: response.data || [], leadsLoaded: true, leadsBusy: false, leadsError: null });
+      renderLeads();
+      if (!silent) setStatus(`CRM готова. Заявок: ${(response.data || []).length}`, 'good');
+      return response.data || [];
+    } catch (error) {
+      const message = friendlyError(error);
+      setState({ leadsBusy: false, leadsError: message, leadsLoaded: true });
+      renderLeads();
+      setStatus(`Ошибка загрузки заявок: ${message}`, 'error');
+      return v4State.leads || [];
+    } finally {
+      leadsLoadPromise = null;
+    }
+  })();
+
+  return leadsLoadPromise;
 }
 
 async function updateLeadStatus(id, status) {
@@ -199,8 +217,8 @@ async function updateLeadStatus(id, status) {
       .eq('id', id)
       .select(LEAD_FIELDS)
       .single(),
-    12000,
-    'Статус заявки не обновился вовремя'
+    22000,
+    'Статус заявки обновляется дольше обычного'
   );
   if (response.error) throw response.error;
   const updated = response.data;
@@ -209,7 +227,7 @@ async function updateLeadStatus(id, status) {
 }
 
 function bindLeadEvents() {
-  byId('reloadLeadsBtn')?.addEventListener('click', () => loadLeads().then(() => toast('Заявки обновлены')));
+  byId('reloadLeadsBtn')?.addEventListener('click', () => loadLeads({ force: true }).then(() => toast('Заявки обновлены')));
   byId('leadStatusFilter')?.addEventListener('change', (event) => {
     setLeadFilters({ status: event.target.value });
     renderLeads();
