@@ -6,6 +6,8 @@ const baseHeaders = Object.freeze({
   'Content-Type': 'application/json'
 });
 
+let refreshPromise = null;
+
 function storage() {
   return window.localStorage;
 }
@@ -40,7 +42,7 @@ function clearSession() {
   storage().removeItem(V4_CONFIG.authStorageKey);
 }
 
-async function refreshSession(session) {
+async function performRefresh(session) {
   if (!session?.refresh_token) return null;
   const { data } = await fetchJson(
     `${V4_CONFIG.supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
@@ -53,15 +55,28 @@ async function refreshSession(session) {
   return refreshed;
 }
 
+async function refreshSession(session) {
+  if (!session?.refresh_token) return null;
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = performRefresh(session)
+    .catch((error) => {
+      clearSession();
+      throw error;
+    })
+    .finally(() => {
+      refreshPromise = null;
+    });
+
+  return refreshPromise;
+}
+
 async function currentSession() {
   const session = readSession();
   if (!session?.access_token) return null;
   const now = Math.floor(Date.now() / 1000);
-  if (session.expires_at && session.expires_at - now < 60) {
-    return refreshSession(session).catch(() => {
-      clearSession();
-      return null;
-    });
+  if (session.expires_at && session.expires_at - now < 90) {
+    return refreshSession(session).catch(() => null);
   }
   return session;
 }
@@ -204,6 +219,7 @@ export const supabaseClient = {
       }
     },
     async signOut() {
+      refreshPromise = null;
       await timeout(Promise.resolve(clearSession()), V4_CONFIG.timeouts.logoutMs, 'Выход не завершился вовремя');
       return { error: null };
     }
