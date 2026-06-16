@@ -5,8 +5,9 @@ import { byId, setStatus, toast } from './ui.js';
 import { openLeadRoute } from './router.js';
 
 const LEAD_FIELDS = 'id,created_at,name,phone,source,service,message,status,lead_quality,estimated_amount,next_contact_at,page_url,budget,city,converted_order_id,converted_client_id';
-const ACTIVE_HIDDEN_STATUSES = new Set(['Спам']);
-const ARCHIVE_STATUSES = new Set(['Спам']);
+const CLOSED_STATUSES = ['Спам', 'Создан заказ', 'Отказ', 'Не отвечает', 'Дорого', 'Передумал'];
+const ACTIVE_HIDDEN_STATUSES = new Set(CLOSED_STATUSES);
+const ARCHIVE_STATUSES = new Set(CLOSED_STATUSES);
 const STATUSES = ['Все', 'Новая', 'В работе', 'Уточнение деталей', 'Расчёт подготовлен', 'КП отправлено', 'Ждём ответ', 'Нужно пересчитать', 'Согласовано', 'Создан заказ', 'Отказ', 'Не отвечает', 'Дорого', 'Передумал', 'Спам'];
 
 function esc(value) {
@@ -82,8 +83,8 @@ function renderStatusOptions() {
   if (!select) return;
   const current = select.value || v4State.leadFilters.status || 'active';
   const options = [
-    ['active', 'Активные'],
-    ['archive', 'Архив / спам'],
+    ['active', 'Активные в работе'],
+    ['archive', 'Архив / завершённые'],
     ...STATUSES.map((status) => [status, status])
   ];
   select.innerHTML = options.map(([value, label]) => `<option value="${esc(value)}" ${value === current ? 'selected' : ''}>${esc(label)}</option>`).join('');
