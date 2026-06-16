@@ -28,6 +28,12 @@ function formatDate(value) {
   }
 }
 
+function defaultDeadline() {
+  const date = new Date();
+  date.setDate(date.getDate() + 3);
+  return date.toISOString().slice(0, 10);
+}
+
 function ensureHost() {
   if (byId('ordersBox')) return byId('ordersBox');
   const offersBox = byId('offersBox');
@@ -52,12 +58,19 @@ function eligibleOffers() {
   });
 }
 
-function offerOptions() {
+function orderTitleFromOffer(offer) {
+  if (!offer) return '';
+  const rawTitle = offer.title || 'Заказ РА Лидер';
+  return rawTitle.replace(/^КП:\s*/i, '').trim() || rawTitle;
+}
+
+function offerOptions(selectedId = '') {
   const offers = eligibleOffers();
   if (!offers.length) return '<option value="">Нет согласованного КП без заказа</option>';
+  const selected = selectedId || (offers.length === 1 ? offers[0].id : '');
   return [
-    '<option value="">Выберите согласованное КП</option>',
-    ...offers.map((offer) => `<option value="${esc(offer.id)}">${esc(offer.title || 'КП')} — ${money(offer.total_sum)}</option>`)
+    offers.length === 1 ? '' : '<option value="">Выберите согласованное КП</option>',
+    ...offers.map((offer) => `<option value="${esc(offer.id)}" ${offer.id === selected ? 'selected' : ''}>${esc(offer.title || 'КП')} — ${money(offer.total_sum)}</option>`)
   ].join('');
 }
 
@@ -87,6 +100,8 @@ function renderOrderCard(order) {
 
 function renderCreateForm() {
   const offers = eligibleOffers();
+  const firstOffer = offers[0] || null;
+  const defaultTitle = orderTitleFromOffer(firstOffer);
   if (v4State.currentLead?.converted_order_id) {
     return '<div class="v4-empty">По этой заявке заказ уже создан. Повторное создание заблокировано.</div>';
   }
@@ -96,18 +111,19 @@ function renderCreateForm() {
   return `
     <div class="v4-order-form">
       <h4>Создать заказ из согласованного КП</h4>
+      <div class="v4-order-warning">Проверьте название, срок, статус макета и комментарий. После создания заказ будет связан с заявкой, расчётом и КП.</div>
       <div class="v4-form-grid">
         <label>Согласованное КП
-          <select id="orderOfferId">${offerOptions()}</select>
+          <select id="orderOfferId">${offerOptions(firstOffer?.id || '')}</select>
         </label>
         <label>Название заказа
-          <input id="orderProjectName" placeholder="Заполнится по названию КП">
+          <input id="orderProjectName" value="${esc(defaultTitle)}" placeholder="Например: Баннер 3×2 для клиента">
         </label>
         <label>Тип заказа
           <select id="orderType"><option>Смешанный</option><option>Изготовление</option><option>Услуга</option></select>
         </label>
         <label>Срок
-          <input id="orderDeadline" type="date">
+          <input id="orderDeadline" type="date" value="${defaultDeadline()}">
         </label>
         <label>Статус макета
           <select id="orderLayoutStatus"><option>Макета нет</option><option>Нужен дизайн</option><option>Клиент прислал макет</option><option>В работе у дизайнера</option><option>На согласовании</option><option>Согласован</option></select>
@@ -116,7 +132,6 @@ function renderCreateForm() {
           <textarea id="orderComment" rows="3" placeholder="Важные условия, доставка, монтаж, особенности производства"></textarea>
         </label>
       </div>
-      <div class="v4-order-warning">После создания заказ появится в рабочей CRM v2. Заявка, расчёт и КП будут связаны с ним автоматически.</div>
       <div class="v4-form-actions">
         <button id="createOrderV4Btn" type="button" class="v4-primary" ${createBusy ? 'disabled' : ''}>${createBusy ? 'Создаю заказ...' : 'Создать заказ'}</button>
       </div>
@@ -269,8 +284,9 @@ async function updateLinks(bundle, order) {
 }
 
 function captureOrderForm() {
+  const offers = eligibleOffers();
   return {
-    offerId: byId('orderOfferId')?.value || '',
+    offerId: byId('orderOfferId')?.value || (offers.length === 1 ? offers[0].id : ''),
     projectName: byId('orderProjectName')?.value?.trim() || '',
     orderType: byId('orderType')?.value || 'Смешанный',
     deadline: byId('orderDeadline')?.value || '',
@@ -291,7 +307,7 @@ async function createOrder() {
   try {
     setStatus('Создаю заказ...', 'warn');
     const bundle = await loadOrderBundle(form.offerId);
-    const projectName = form.projectName || bundle.offer.title || bundle.calculation.title || 'Заказ РА Лидер';
+    const projectName = form.projectName || orderTitleFromOffer(bundle.offer) || bundle.calculation.title || 'Заказ РА Лидер';
     const comment = form.comment || bundle.calculation.public_comment || bundle.need?.description || '';
     const rows = buildRows(bundle.items);
     const totals = {
@@ -326,7 +342,7 @@ async function createOrder() {
 
     orders = [order, ...orders.filter((item) => item.id !== order.id)];
     setState({
-      currentLead: { ...bundle.lead, status: 'Создан заказ', converted_order_id: order.id },
+      currentLead: { ...bundle.lead, status: 'Создан заказ', converted_order_id: order.id, converted_at: new Date().toISOString() },
       calculations: (v4State.calculations || []).map((calc) => calc.id === bundle.calculation.id ? { ...calc, status: 'Создан заказ', order_id: order.id } : calc),
       offers: (v4State.offers || []).map((offer) => offer.id === bundle.offer.id ? { ...offer, order_id: order.id } : offer),
       leads: (v4State.leads || []).map((lead) => lead.id === bundle.lead.id ? { ...lead, status: 'Создан заказ', converted_order_id: order.id } : lead)
@@ -346,6 +362,14 @@ async function createOrder() {
 function bindOrderEvents() {
   byId('leadCardSection')?.addEventListener('click', async (event) => {
     if (event.target.closest('#createOrderV4Btn')) await createOrder();
+  });
+
+  byId('leadCardSection')?.addEventListener('change', (event) => {
+    const select = event.target.closest('#orderOfferId');
+    if (!select) return;
+    const offer = eligibleOffers().find((item) => item.id === select.value);
+    const input = byId('orderProjectName');
+    if (offer && input && !input.value.trim()) input.value = orderTitleFromOffer(offer);
   });
 
   document.addEventListener('leader-v4:lead-card-rendered', () => {
