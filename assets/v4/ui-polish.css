@@ -1,0 +1,184 @@
+/* CRM v4 UI polish: единая визуальная логика, статусы, акценты и читаемость */
+
+.v4-card{
+  border-color:#dbeafe;
+  box-shadow:0 18px 44px rgba(15,23,42,.07);
+}
+
+.v4-section-head,
+.v4-subcard-head,
+.v4-card-view-head{
+  border-bottom:1px solid #e2e8f0;
+  padding-bottom:12px;
+  margin-bottom:12px;
+}
+
+.v4-status,
+.v4-lead-status,
+.v4-offer-title-row span,
+.v4-saved-calc-title span{
+  border:1px solid transparent;
+  box-shadow:0 6px 14px rgba(15,23,42,.05);
+}
+
+.v4-lead-status,
+.v4-offer-title-row span{
+  background:#e0f2fe;
+  color:#075985;
+}
+
+.v4-lead-status.is-good,
+.v4-offer-title-row span.is-good,
+.v4-status.is-good{
+  background:#dcfce7;
+  color:#166534;
+  border-color:#bbf7d0;
+}
+
+.v4-lead-status.is-warn,
+.v4-offer-title-row span.is-warn,
+.v4-status.is-warn{
+  background:#fef3c7;
+  color:#92400e;
+  border-color:#fde68a;
+}
+
+.v4-lead-status.is-error,
+.v4-offer-title-row span.is-error,
+.v4-status.is-error{
+  background:#fee2e2;
+  color:#991b1b;
+  border-color:#fecaca;
+}
+
+.v4-primary,
+button.v4-primary{
+  background:linear-gradient(135deg,#1d4ed8,#2563eb)!important;
+  color:#fff!important;
+  border-color:#1d4ed8!important;
+  box-shadow:0 10px 22px rgba(37,99,235,.22);
+}
+
+button,
+.v4-card-view-actions a,
+.v4-lead-actions a{
+  transition:transform .12s ease,box-shadow .12s ease,background .12s ease;
+}
+
+button:hover,
+.v4-card-view-actions a:hover,
+.v4-lead-actions a:hover{
+  transform:translateY(-1px);
+  box-shadow:0 8px 18px rgba(15,23,42,.12);
+}
+
+button:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+  transform:none!important;
+  box-shadow:none!important;
+}
+
+.v4-action-panel{
+  border-color:#bfdbfe!important;
+  background:linear-gradient(135deg,#eff6ff 0%,#fff 80%)!important;
+}
+
+.v4-needs-section{
+  border-color:#ddd6fe!important;
+  background:linear-gradient(135deg,#f5f3ff 0%,#fff 78%)!important;
+}
+
+.v4-calculations-host .v4-subcard,
+.v4-calc-auto-box{
+  border-color:#bae6fd!important;
+}
+
+.v4-offers-section{
+  border-color:#bbf7d0!important;
+  background:linear-gradient(135deg,#f0fdf4 0%,#fff 78%)!important;
+}
+
+.v4-orders-section{
+  border-color:#fed7aa!important;
+  background:linear-gradient(135deg,#fff7ed 0%,#fff 78%)!important;
+}
+
+.v4-workflow-guide div{
+  border:1px solid #e2e8f0;
+  background:#fff;
+}
+
+.v4-workflow-guide div.is-done{
+  border-color:#bbf7d0;
+  background:#f0fdf4;
+  color:#166534;
+}
+
+.v4-lead-card,
+.v4-offer-card,
+.v4-saved-calc-card{
+  border-left:5px solid #bfdbfe;
+}
+
+.v4-lead-card:hover,
+.v4-offer-card:hover,
+.v4-saved-calc-card:hover{
+  border-left-color:#2563eb;
+}
+
+.v4-lead-message,
+.v4-empty{
+  border-radius:14px;
+}
+
+.v4-empty{
+  background:#f8fafc;
+  border:1px dashed #cbd5e1;
+}
+
+.v4-empty.is-error{
+  background:#fef2f2;
+  border-color:#fecaca;
+  color:#991b1b;
+}
+
+.v4-form-grid label,
+.v4-detail-grid div,
+.v4-profile-grid div{
+  border-radius:14px;
+}
+
+.v4-detail-grid div,
+.v4-profile-grid div{
+  background:#f8fafc;
+  border:1px solid #e2e8f0;
+}
+
+.v4-detail-grid dt,
+.v4-profile-grid dt{
+  color:#64748b;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  font-size:11px;
+}
+
+.v4-detail-grid dd,
+.v4-profile-grid dd{
+  color:#0f172a;
+  font-weight:900;
+}
+
+.v4-toast{
+  box-shadow:0 18px 50px rgba(15,23,42,.24);
+}
+
+@media(max-width:640px){
+  .v4-section-head,
+  .v4-subcard-head,
+  .v4-card-view-head{
+    padding-bottom:10px;
+    margin-bottom:10px;
+  }
+}
