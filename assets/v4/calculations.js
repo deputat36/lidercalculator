@@ -5,6 +5,13 @@ import { byId, setStatus, toast } from './ui.js';
 
 const CALC_FIELDS = 'id,lead_id,need_id,client_id,title,status,version_number,client_total,contractor_cost,profit,margin_percent,warning_level,warnings,public_comment,internal_comment,commercial_offer_id,order_id,created_by,updated_by,created_at,updated_at';
 const ITEM_FIELDS = 'id,calculation_id,lead_id,catalog_id,category,item_type,name,unit,qty,contractor_price,contractor_sum,markup_percent,client_price,client_sum,profit,margin_percent,comment,data,sort_order,created_at,updated_at';
+const QUICK_TEMPLATES = [
+  { key: 'banner', label: 'Баннер', name: 'Баннер, печать и обработка', unit: 'м²', qty: 1, comment: 'Печать, обработка края, люверсы по необходимости' },
+  { key: 'sign', label: 'Вывеска', name: 'Вывеска под ключ', unit: 'комплект', qty: 1, comment: 'Материалы, изготовление, подготовка к монтажу' },
+  { key: 'film', label: 'Плёнка', name: 'Плёнка / наклейки', unit: 'м²', qty: 1, comment: 'Печать, резка или подготовка макета' },
+  { key: 'design', label: 'Дизайн', name: 'Разработка макета', unit: 'услуга', qty: 1, comment: 'Подготовка макета к производству' },
+  { key: 'install', label: 'Монтаж', name: 'Монтажные работы', unit: 'услуга', qty: 1, comment: 'Выезд, установка, крепёж по ситуации' }
+];
 let draftItems = [];
 let saveBusy = false;
 
@@ -115,14 +122,50 @@ function renderCalcCard(calc) {
   `;
 }
 
+function currentDraftItem() {
+  return calcItem({
+    name: val('calcItemName') || 'Новая позиция',
+    unit: val('calcItemUnit') || 'шт',
+    qty: num('calcItemQty') || 1,
+    contractor_price: num('calcItemCost'),
+    client_price: num('calcItemClient'),
+    comment: val('calcItemComment')
+  }, 0);
+}
+
+function renderItemPreview() {
+  const preview = byId('calcItemPreview');
+  if (!preview) return;
+  const item = currentDraftItem();
+  const className = item.client_sum <= 0 || item.contractor_sum <= 0 || item.profit < 0 ? ' is-error' : item.margin_percent < 20 ? ' is-warn' : ' is-good';
+  const hint = item.client_sum <= 0
+    ? 'Укажите цену клиенту.'
+    : item.contractor_sum <= 0
+      ? 'Проверьте себестоимость, чтобы видеть реальную прибыль.'
+      : item.profit < 0
+        ? 'Позиция убыточная.'
+        : item.margin_percent < 20
+          ? 'Маржа ниже 20%. Лучше пересмотреть цену.'
+          : 'Позиция выглядит нормально.';
+  preview.className = `v4-calc-live${className}`;
+  preview.innerHTML = `
+    <span><b>Сумма клиенту:</b> ${money(item.client_sum)}</span>
+    <span><b>Себестоимость:</b> ${money(item.contractor_sum)}</span>
+    <span><b>Прибыль:</b> ${money(item.profit)}</span>
+    <span><b>Маржа:</b> ${Math.round(item.margin_percent)}%</span>
+    <em>${esc(hint)}</em>
+  `;
+}
+
 function renderDraftItems() {
   const list = byId('calcDraftItems');
   const totalBox = byId('calcDraftTotals');
+  const guideBox = byId('calcDraftGuide');
   if (!list || !totalBox) return;
   const result = totals();
   list.innerHTML = draftItems.length ? result.items.map((item, index) => `
     <tr>
-      <td>${esc(item.name)}</td>
+      <td>${esc(item.name)}${item.comment ? `<small>${esc(item.comment)}</small>` : ''}</td>
       <td>${esc(item.unit)}</td>
       <td>${item.qty}</td>
       <td>${money(item.contractor_price)}</td>
@@ -130,18 +173,37 @@ function renderDraftItems() {
       <td>${money(item.client_sum)}</td>
       <td><button type="button" data-action="remove-calc-item" data-index="${index}">×</button></td>
     </tr>
-  `).join('') : '<tr><td colspan="7">Позиции пока не добавлены.</td></tr>';
+  `).join('') : '<tr><td colspan="7">Позиции пока не добавлены. Выберите быстрый шаблон или заполните позицию вручную.</td></tr>';
+  const levelClass = result.warning_level === 'critical' ? ' is-error' : result.warning_level === 'warning' ? ' is-warn' : ' is-good';
+  totalBox.className = `v4-calc-totals v4-calc-total-panel${levelClass}`;
   totalBox.innerHTML = `
     <span><b>Клиенту:</b> ${money(result.client_total)}</span>
     <span><b>Себестоимость:</b> ${money(result.contractor_cost)}</span>
     <span><b>Прибыль:</b> ${money(result.profit)}</span>
     <span><b>Маржа:</b> ${Math.round(result.margin_percent)}%</span>
   `;
+  if (guideBox) {
+    guideBox.innerHTML = result.warnings.length
+      ? `<div class="v4-calc-warnings">Перед сохранением проверьте: ${result.warnings.map(esc).join(', ')}</div>`
+      : '<div class="v4-calc-ok">Расчёт можно сохранять. После этого ниже появится возможность сформировать КП.</div>';
+  }
+  renderItemPreview();
+}
+
+function renderTemplateButtons() {
+  return QUICK_TEMPLATES.map((template) => `<button type="button" data-calc-template="${esc(template.key)}">${esc(template.label)}</button>`).join('');
 }
 
 function renderCalcForm() {
   return `
     <div class="v4-calc-form">
+      <div class="v4-calc-wizard-head">
+        <div>
+          <h4>Новый расчёт</h4>
+          <p>Заполните одну позицию, добавьте её в таблицу, проверьте итог и сохраните расчёт. Себестоимость клиент не увидит — она нужна только для контроля прибыли.</p>
+        </div>
+        <div class="v4-calc-steps"><span>1. Позиции</span><span>2. Итог</span><span>3. КП</span></div>
+      </div>
       <div class="v4-form-grid">
         <label>Название расчёта
           <input id="calcTitle" placeholder="Например: Баннер 3×2 с люверсами">
@@ -155,6 +217,7 @@ function renderCalcForm() {
       </div>
       <div class="v4-calc-item-add">
         <h4>Добавить позицию</h4>
+        <div class="v4-template-buttons">${renderTemplateButtons()}</div>
         <div class="v4-form-grid">
           <label>Название
             <input id="calcItemName" placeholder="Баннер 3×2, печать, люверсы">
@@ -175,8 +238,16 @@ function renderCalcForm() {
             <input id="calcItemComment" placeholder="плотность, проклейка, монтаж и т.д.">
           </label>
         </div>
+        <div class="v4-price-presets">
+          <span>Быстро поставить цену от себестоимости:</span>
+          <button type="button" data-price-multiplier="1.25">+25%</button>
+          <button type="button" data-price-multiplier="1.4">+40%</button>
+          <button type="button" data-price-multiplier="1.7">+70%</button>
+          <button type="button" data-price-multiplier="2">×2</button>
+        </div>
+        <div id="calcItemPreview" class="v4-calc-live"></div>
         <div class="v4-form-actions">
-          <button id="addCalcItemBtn" type="button">Добавить позицию</button>
+          <button id="addCalcItemBtn" type="button" class="v4-primary">Добавить позицию в расчёт</button>
         </div>
       </div>
       <div class="v4-table-wrap">
@@ -186,6 +257,7 @@ function renderCalcForm() {
         </table>
       </div>
       <div id="calcDraftTotals" class="v4-calc-totals"></div>
+      <div id="calcDraftGuide"></div>
       <div class="v4-form-actions">
         <button id="saveCalculationBtn" type="button" class="v4-primary">Сохранить расчёт</button>
         <button id="clearCalculationBtn" type="button">Очистить</button>
@@ -211,12 +283,12 @@ export function renderCalculations() {
       <div class="v4-subcard-head">
         <div>
           <h3>Расчёты</h3>
-          <p>Черновики расчётов сохраняются отдельно от заказа. КП и заказ будут следующим этапом.</p>
+          <p>Сохраняйте варианты расчёта до заказа. После сохранения можно сформировать КП и отправить клиенту понятный текст без себестоимости.</p>
         </div>
         <span class="v4-muted">Расчётов: ${calculations.length}</span>
       </div>
       <div class="v4-calculations-list">
-        ${v4State.calculationsError ? `<div class="v4-empty is-error">${esc(v4State.calculationsError)}</div>` : calculations.length ? calculations.map(renderCalcCard).join('') : '<div class="v4-empty">Расчётов пока нет. Добавьте первый расчёт по потребности или по заявке.</div>'}
+        ${v4State.calculationsError ? `<div class="v4-empty is-error">${esc(v4State.calculationsError)}</div>` : calculations.length ? calculations.map(renderCalcCard).join('') : '<div class="v4-empty">Расчётов пока нет. Начните с первого варианта: выберите шаблон позиции, внесите себестоимость и цену клиенту.</div>'}
       </div>
       ${renderCalcForm()}
     </section>
@@ -255,6 +327,33 @@ export async function loadCalculations(leadId = v4State.route.leadId) {
   }
 }
 
+function fillDraftFromTemplate(key) {
+  const template = QUICK_TEMPLATES.find((item) => item.key === key);
+  if (!template) return;
+  const title = byId('calcTitle');
+  const name = byId('calcItemName');
+  const unit = byId('calcItemUnit');
+  const qty = byId('calcItemQty');
+  const comment = byId('calcItemComment');
+  if (title && !title.value.trim()) title.value = `${template.label} для ${v4State.currentLead?.name || 'клиента'}`;
+  if (name) name.value = template.name;
+  if (unit) unit.value = template.unit;
+  if (qty) qty.value = String(template.qty);
+  if (comment) comment.value = template.comment;
+  renderItemPreview();
+}
+
+function applyPriceMultiplier(multiplier) {
+  const cost = num('calcItemCost');
+  if (!cost) {
+    toast('Сначала укажите себестоимость за единицу');
+    return;
+  }
+  const input = byId('calcItemClient');
+  if (input) input.value = String(Math.ceil(cost * Number(multiplier || 1)));
+  renderItemPreview();
+}
+
 function addDraftItem() {
   const item = {
     name: val('calcItemName') || 'Позиция расчёта',
@@ -266,6 +365,15 @@ function addDraftItem() {
     category: 'Ручная позиция',
     item_type: 'Услуга'
   };
+  const calculated = calcItem(item, draftItems.length);
+  if (calculated.client_sum <= 0) {
+    toast('Укажите цену клиенту, иначе позиция будет нулевая');
+    return;
+  }
+  if (calculated.profit < 0) {
+    toast('Позиция убыточная. Проверьте себестоимость и цену клиенту');
+    return;
+  }
   draftItems.push(item);
   ['calcItemName', 'calcItemCost', 'calcItemClient', 'calcItemComment'].forEach((id) => { const input = byId(id); if (input) input.value = ''; });
   if (byId('calcItemQty')) byId('calcItemQty').value = '1';
@@ -290,6 +398,10 @@ async function saveCalculation() {
   const result = totals();
   if (!result.items.length) {
     toast('Добавьте хотя бы одну позицию расчёта');
+    return;
+  }
+  if (result.client_total <= 0 || result.profit < 0) {
+    toast('Проверьте расчёт: сумма клиенту должна быть больше 0, расчёт не должен быть убыточным');
     return;
   }
   const calcPayload = {
@@ -341,7 +453,7 @@ async function saveCalculation() {
     setState({ calculations: [calc, ...(v4State.calculations || [])] });
     draftItems = [];
     renderCalculations();
-    setStatus('Расчёт сохранён', 'good');
+    setStatus('Расчёт сохранён. Теперь можно сформировать КП ниже.', 'good');
     toast('Расчёт сохранён');
   } catch (error) {
     if (createdCalculationId) {
@@ -368,10 +480,19 @@ function bindCalculationEvents() {
       renderCalculations();
     }
     if (event.target.closest('#saveCalculationBtn')) saveCalculation();
+    const template = event.target.closest('button[data-calc-template]');
+    if (template) fillDraftFromTemplate(template.dataset.calcTemplate);
+    const pricePreset = event.target.closest('button[data-price-multiplier]');
+    if (pricePreset) applyPriceMultiplier(pricePreset.dataset.priceMultiplier);
     const remove = event.target.closest('button[data-action="remove-calc-item"]');
     if (remove) {
       draftItems.splice(Number(remove.dataset.index), 1);
       renderDraftItems();
+    }
+  });
+  byId('leadCardSection')?.addEventListener('input', (event) => {
+    if (event.target.closest('#calcItemName, #calcItemUnit, #calcItemQty, #calcItemCost, #calcItemClient, #calcItemComment')) {
+      renderItemPreview();
     }
   });
   document.addEventListener('leader-v4:lead-card-rendered', () => renderCalculations());
