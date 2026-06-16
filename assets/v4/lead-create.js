@@ -76,7 +76,7 @@ function resetForm() {
     if (element) element.value = '';
   });
   if (byId('manualLeadSource')) byId('manualLeadSource').value = 'Вручную';
-  if (byId('manualLeadContact')) byId('manualLeadContact').value = 'Телефон';
+  if (byId('manualLeadContact')) byId('manualLeadContact').value = 'MAX';
   if (byId('manualLeadQuality')) byId('manualLeadQuality').value = 'Не оценена';
   if (byId('manualLeadNextContact')) byId('manualLeadNextContact').value = defaultNextContactValue();
 }
@@ -99,7 +99,7 @@ function renderForm() {
             <select id="manualLeadSource">
               <option>Вручную</option>
               <option>Телефон</option>
-              <option>WhatsApp</option>
+              <option>MAX</option>
               <option>ВКонтакте</option>
               <option>Офис</option>
               <option>Повторный клиент</option>
@@ -114,8 +114,8 @@ function renderForm() {
           </label>
           <label>Как связаться
             <select id="manualLeadContact">
+              <option>MAX</option>
               <option>Телефон</option>
-              <option>WhatsApp</option>
               <option>Сообщение ВК</option>
               <option>Любой способ</option>
             </select>
@@ -136,7 +136,7 @@ function renderForm() {
           </label>
         </div>
         <label class="v4-manual-lead-comment">Комментарий / что нужно клиенту
-          <textarea id="manualLeadMessage" rows="3" placeholder="Например: нужен баннер 3×2 м, уточнить материал и сроки"></textarea>
+          <textarea id="manualLeadMessage" rows="3" placeholder="Например: клиент написал в MAX, нужен баннер 3×2 м, уточнить материал и сроки"></textarea>
         </label>
         <div class="v4-form-actions">
           <button id="createManualLeadBtn" type="submit" class="v4-primary">Создать заявку</button>
