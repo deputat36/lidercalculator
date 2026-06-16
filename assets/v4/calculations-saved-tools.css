@@ -56,6 +56,8 @@
 }
 .v4-saved-calc-actions{
   display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
   gap:8px;
 }
 .v4-saved-calc-actions button{
@@ -68,19 +70,55 @@
   background:#eff6ff;
   padding:14px;
 }
-.v4-saved-calc-table{
+.v4-saved-calc-table,
+.v4-saved-calc-edit-table{
   min-width:980px;
 }
-.v4-saved-calc-table small{
+.v4-saved-calc-table small,
+.v4-saved-calc-edit-table small{
   display:block;
   color:#64748b;
   margin-top:4px;
+}
+.v4-saved-calc-editor{
+  background:linear-gradient(135deg,#eff6ff 0%,#fff 72%);
+}
+.v4-saved-calc-version-form{
+  margin:12px 0;
+}
+.v4-saved-calc-version-form input,
+.v4-saved-calc-edit-table input{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:8px 9px;
+  font:inherit;
+  background:#fff;
+}
+.v4-saved-calc-edit-table td:first-child input:first-child{
+  min-width:260px;
+}
+.v4-saved-calc-edit-table td:first-child small input{
+  margin-top:6px;
+  min-width:260px;
+}
+.v4-saved-calc-edit-table td:nth-child(2) input{
+  min-width:180px;
+}
+.v4-saved-calc-edit-table td:nth-child(3) input{
+  min-width:70px;
+}
+.v4-saved-calc-edit-table td:nth-child(4) input,
+.v4-saved-calc-edit-table td:nth-child(5) input,
+.v4-saved-calc-edit-table td:nth-child(6) input{
+  min-width:110px;
 }
 @media(max-width:850px){
   .v4-saved-calc-card{
     grid-template-columns:1fr;
   }
   .v4-saved-calc-actions{
+    justify-content:stretch;
     flex-direction:column;
   }
 }
