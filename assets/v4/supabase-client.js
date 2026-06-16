@@ -181,6 +181,21 @@ class QueryBuilder {
   }
 }
 
+async function rpc(name, args = {}, options = {}) {
+  try {
+    const headers = await authHeaders();
+    const { data, response } = await fetchJson(
+      `${V4_CONFIG.supabaseUrl}/rest/v1/rpc/${encodeURIComponent(name)}`,
+      { method: 'POST', headers, body: JSON.stringify(args || {}) },
+      options.timeoutMs || V4_CONFIG.timeouts.requestMs,
+      options.timeoutMessage || 'RPC-запрос к Supabase не ответил вовремя'
+    );
+    return { data, error: null, status: response.status };
+  } catch (error) {
+    return { data: null, error, status: error.status || 0 };
+  }
+}
+
 export const supabaseClient = {
   auth: {
     async getSession() {
@@ -210,7 +225,8 @@ export const supabaseClient = {
   },
   from(table) {
     return new QueryBuilder(table);
-  }
+  },
+  rpc
 };
 
 window.LeaderV4 = window.LeaderV4 || {};
