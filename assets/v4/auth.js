@@ -4,9 +4,36 @@ import { timeout, friendlyError, isNetworkError } from './api.js';
 import { setState, resetAuthState, v4State } from './state.js';
 import { bindAuthUi, readCredentials, renderProfile, setAuthBusy, setProfileNotice, setStatus, showLoggedIn, showLoggedOut, toast } from './ui.js';
 
+async function ensureProfileForUser(user) {
+  if (!user?.id) return null;
+  setProfileNotice('Проверяю профиль доступа...');
+  try {
+    const response = await timeout(
+      supabaseClient.rpc('leader_ensure_profile', { user_email: user.email || '' }, {
+        timeoutMs: V4_CONFIG.timeouts.profileMs + 4000,
+        timeoutMessage: 'Профиль доступа не подготовился вовремя'
+      }),
+      V4_CONFIG.timeouts.profileMs + 4500,
+      'Профиль доступа не подготовился вовремя'
+    );
+    if (response.error) throw response.error;
+    const profile = response.data || null;
+    if (profile && typeof profile === 'object') {
+      setState({ profile, profileLoaded: true });
+      renderProfile(profile);
+      setProfileNotice('');
+    }
+    return profile;
+  } catch (error) {
+    console.warn('CRM v4 profile bootstrap warning:', error);
+    setProfileNotice('Профиль доступа временно не удалось подготовить. CRM откроется, но часть данных может не загрузиться.');
+    return null;
+  }
+}
+
 async function loadProfileInBackground(user) {
   if (!user?.id) return;
-  setProfileNotice('Профиль загружается в фоне...');
+  if (!v4State.profileLoaded) setProfileNotice('Профиль загружается в фоне...');
   try {
     const response = await timeout(
       supabaseClient
@@ -57,6 +84,8 @@ export async function checkAuth() {
       setStatus('Нужен вход', 'warn');
       return false;
     }
+    setStatus('Проверяю профиль доступа', 'warn');
+    await ensureProfileForUser(data.session.user);
     openCrm(data.session, 'CRM готова');
     return true;
   } catch (error) {
@@ -82,6 +111,8 @@ export async function login() {
     const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) throw error;
     if (!data.session?.user) throw new Error('Сессия не получена');
+    setStatus('Подготавливаю профиль доступа', 'warn');
+    await ensureProfileForUser(data.session.user);
     setStatus('Вход выполнен', 'good');
     openCrm(data.session, 'CRM готова');
     toast('Вход выполнен');
