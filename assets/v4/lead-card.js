@@ -54,11 +54,8 @@ function phoneHref(phone) {
   return cleaned ? `tel:${cleaned}` : '';
 }
 
-function whatsappHref(phone) {
-  let digits = String(phone || '').replace(/\D/g, '');
-  if (digits.length === 11 && digits.startsWith('8')) digits = `7${digits.slice(1)}`;
-  if (digits.length === 10) digits = `7${digits}`;
-  return digits ? `https://wa.me/${digits}` : '';
+function normalizePhoneForCopy(phone) {
+  return String(phone || '').replace(/[^\d+]/g, '').trim();
 }
 
 function payloadRows(payload) {
@@ -72,7 +69,7 @@ function payloadRows(payload) {
 function statusHint(lead) {
   const status = lead.status || 'Новая';
   if (lead.converted_order_id || status === 'Создан заказ') return 'Заказ уже создан. Дальше контролируйте производство, оплату и выдачу результата.';
-  if (status === 'Новая') return 'Начните с звонка или WhatsApp, уточните задачу и переведите заявку в работу.';
+  if (status === 'Новая') return 'Начните с звонка или сообщения в MAX, уточните задачу и переведите заявку в работу.';
   if (status === 'В работе') return 'Зафиксируйте потребность клиента, добавьте позиции расчёта и сохраните первый вариант.';
   if (status === 'Уточнение деталей') return 'Заполните размеры, материал, сроки, монтаж и всё, что влияет на цену.';
   if (status === 'Расчёт подготовлен') return 'Проверьте маржу и сформируйте коммерческое предложение.';
@@ -95,7 +92,7 @@ function quickStatusButtons(lead) {
 
 function renderLeadDetails(lead) {
   const phone = phoneHref(lead.phone);
-  const whatsapp = whatsappHref(lead.phone);
+  const phoneForMax = normalizePhoneForCopy(lead.phone);
   const payloadHtml = payloadRows(lead.payload);
   const nextContactValue = formatInputDateTime(lead.next_contact_at);
   return `
@@ -110,7 +107,7 @@ function renderLeadDetails(lead) {
           <button id="backToLeadsBtn" type="button">Назад к списку</button>
           <button id="refreshLeadBtn" type="button" class="v4-primary">Обновить</button>
           ${phone ? `<a href="${esc(phone)}">Позвонить</a>` : ''}
-          ${whatsapp ? `<a href="${esc(whatsapp)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
+          ${phoneForMax ? `<button type="button" data-max-copy-phone="${esc(phoneForMax)}">MAX: скопировать телефон</button>` : ''}
         </div>
       </div>
 
@@ -145,6 +142,7 @@ function renderLeadDetails(lead) {
         <div><dt>Статус</dt><dd>${esc(lead.status || 'Новая')}</dd></div>
         <div><dt>Телефон</dt><dd>${esc(lead.phone || '—')}</dd></div>
         <div><dt>Источник</dt><dd>${esc(lead.source || '—')}</dd></div>
+        <div><dt>Связь</dt><dd>${esc(lead.contact_preference || 'MAX / телефон')}</dd></div>
         <div><dt>Город</dt><dd>${esc(lead.city || '—')}</dd></div>
         <div><dt>Бюджет</dt><dd>${money(lead.budget || lead.estimated_amount)}</dd></div>
         <div><dt>Качество</dt><dd>${esc(lead.lead_quality || '—')}</dd></div>
@@ -344,8 +342,29 @@ function clearLeadModules() {
   });
 }
 
+async function copyPhoneForMax(phone) {
+  const value = normalizePhoneForCopy(phone);
+  if (!value) {
+    toast('Телефон не заполнен');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(value);
+    toast('Телефон скопирован для MAX');
+    setStatus('Телефон скопирован для MAX', 'good');
+  } catch (_) {
+    toast(`Телефон для MAX: ${value}`);
+    setStatus(`Телефон для MAX: ${value}`, 'warn');
+  }
+}
+
 function bindLeadCardEvents() {
   byId('leadCardSection')?.addEventListener('click', async (event) => {
+    const maxButton = event.target.closest('button[data-max-copy-phone]');
+    if (maxButton) {
+      await copyPhoneForMax(maxButton.dataset.maxCopyPhone);
+      return;
+    }
     if (event.target.closest('#backToLeadsBtn')) {
       clearLeadUrl();
       clearLeadModules();
