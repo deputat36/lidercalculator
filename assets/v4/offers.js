@@ -118,6 +118,39 @@ function statusClass(status) {
   return '';
 }
 
+function leadStatusForOfferStatus(status) {
+  if (status === 'КП отправлено') return 'КП отправлено';
+  if (status === 'Согласовано') return 'Согласовано';
+  if (status === 'Отклонено') return 'Нужно пересчитать';
+  return 'Расчёт подготовлен';
+}
+
+function mergeLeadState(lead) {
+  if (!lead) return;
+  setState({
+    currentLead: v4State.currentLead?.id === lead.id ? { ...v4State.currentLead, ...lead } : v4State.currentLead,
+    leads: (v4State.leads || []).map((item) => item.id === lead.id ? { ...item, ...lead } : item)
+  });
+}
+
+async function updateLeadStatusFromOffer(leadId, status) {
+  if (!leadId) return null;
+  const leadStatus = leadStatusForOfferStatus(status);
+  const response = await timeout(
+    supabaseClient
+      .from('leader_leads')
+      .update({ status: leadStatus, updated_at: new Date().toISOString() })
+      .eq('id', leadId)
+      .select('*')
+      .single(),
+    12000,
+    'Статус заявки не синхронизировался за 12 секунд'
+  );
+  if (response.error) throw response.error;
+  mergeLeadState(response.data);
+  return response.data;
+}
+
 function renderOfferCard(offer) {
   const isActive = offer.id === activeOfferId;
   return `
@@ -200,7 +233,7 @@ export function renderOffers() {
       <div class="v4-subcard-head">
         <div>
           <h3>Коммерческие предложения</h3>
-          <p>КП формируется только из сохранённого расчёта и содержит только клиентские цены.</p>
+          <p>КП формируется только из сохранённого расчёта. При отправке, согласовании или отклонении статус заявки обновится автоматически.</p>
         </div>
         <span class="v4-muted">КП: ${offers.length}</span>
       </div>
@@ -288,7 +321,9 @@ async function writeOfferEvent({ offerId, leadId, calculationId, eventType, newS
       calculation_id: calculationId,
       event_type: eventType,
       new_status: newStatus,
-      comment: comment || ''
+      comment: comment || '',
+      created_by: v4State.user?.id || null,
+      created_by_email: v4State.user?.email || null
     });
   } catch (error) {
     console.warn('CRM v4 offer event warning:', error);
@@ -350,6 +385,8 @@ async function createOffer() {
       .single();
     if (calcUpdate.error) throw calcUpdate.error;
 
+    const updatedLead = await updateLeadStatusFromOffer(calculation.lead_id, 'Черновик');
+
     await writeOfferEvent({
       offerId: offer.id,
       leadId: calculation.lead_id,
@@ -362,10 +399,12 @@ async function createOffer() {
     activeOfferId = offer.id;
     setState({
       offers: [offer, ...(v4State.offers || [])],
-      calculations: (v4State.calculations || []).map((calc) => calc.id === calculation.id ? { ...calc, ...calcUpdate.data } : calc)
+      calculations: (v4State.calculations || []).map((calc) => calc.id === calculation.id ? { ...calc, ...calcUpdate.data } : calc),
+      currentLead: updatedLead ? { ...(v4State.currentLead || {}), ...updatedLead } : v4State.currentLead,
+      leads: updatedLead ? (v4State.leads || []).map((lead) => lead.id === updatedLead.id ? { ...lead, ...updatedLead } : lead) : v4State.leads
     });
     renderOffers();
-    setStatus('Коммерческое предложение сформировано', 'good');
+    setStatus('Коммерческое предложение сформировано. Статус заявки обновлён.', 'good');
     toast('КП сформировано');
   } catch (error) {
     setStatus(`Ошибка формирования КП: ${friendlyError(error)}`, 'error');
@@ -383,6 +422,7 @@ async function updateOfferStatus(offerId, status) {
   const patch = { status, updated_at: new Date().toISOString() };
   if (status === 'КП отправлено') patch.sent_at = new Date().toISOString();
   if (status === 'Согласовано') patch.approved_at = new Date().toISOString();
+  if (status === 'Отклонено') patch.rejected_at = new Date().toISOString();
 
   const response = await timeout(
     supabaseClient.from('leader_commercial_offers').update(patch).eq('id', offerId).select('*').single(),
@@ -393,12 +433,19 @@ async function updateOfferStatus(offerId, status) {
   const updated = response.data;
 
   const calculationStatus = status === 'КП отправлено' ? 'КП отправлено' : status === 'Согласовано' ? 'Согласован' : status === 'Отклонено' ? 'Отклонён' : 'КП сформировано';
+  let updatedCalculation = null;
   if (updated.calculation_id) {
-    await supabaseClient
+    const calcResponse = await supabaseClient
       .from('leader_lead_calculations')
       .update({ status: calculationStatus, updated_at: new Date().toISOString() })
-      .eq('id', updated.calculation_id);
+      .eq('id', updated.calculation_id)
+      .select('*')
+      .single();
+    if (calcResponse.error) throw calcResponse.error;
+    updatedCalculation = calcResponse.data;
   }
+
+  const updatedLead = await updateLeadStatusFromOffer(updated.lead_id, status);
 
   await writeOfferEvent({
     offerId,
@@ -406,11 +453,17 @@ async function updateOfferStatus(offerId, status) {
     calculationId: updated.calculation_id,
     eventType: 'Изменение статуса КП',
     newStatus: status,
-    comment: `Статус изменён на ${status}`
+    comment: `Статус изменён на ${status}. Статус заявки: ${leadStatusForOfferStatus(status)}`
   });
 
-  setState({ offers: (v4State.offers || []).map((offer) => offer.id === offerId ? updated : offer) });
+  setState({
+    offers: (v4State.offers || []).map((offer) => offer.id === offerId ? updated : offer),
+    calculations: updatedCalculation ? (v4State.calculations || []).map((calc) => calc.id === updatedCalculation.id ? { ...calc, ...updatedCalculation } : calc) : v4State.calculations,
+    currentLead: updatedLead ? { ...(v4State.currentLead || {}), ...updatedLead } : v4State.currentLead,
+    leads: updatedLead ? (v4State.leads || []).map((lead) => lead.id === updatedLead.id ? { ...lead, ...updatedLead } : lead) : v4State.leads
+  });
   renderOffers();
+  setStatus(`КП: ${status}. Заявка: ${leadStatusForOfferStatus(status)}`, status === 'Отклонено' ? 'warn' : 'good');
   toast(`Статус КП: ${status}`);
 }
 
