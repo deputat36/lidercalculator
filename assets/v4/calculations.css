@@ -106,29 +106,83 @@
   font-size:12px;
   font-weight:900;
 }
-.v4-calc-item-add{
+.v4-calc-auto-box{
   margin-top:14px;
-  border-top:1px solid var(--line);
-  padding-top:14px;
+  border:1px solid #dbeafe;
+  border-radius:18px;
+  background:linear-gradient(135deg,#eff6ff 0%,#fff 72%);
+  padding:16px;
 }
-.v4-calc-item-add h4{
+.v4-calc-auto-box h4{
   margin:0 0 12px;
 }
-.v4-template-buttons,.v4-price-presets{
+.v4-mode-buttons{
   display:flex;
   flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:12px;
+}
+.v4-mode-buttons button{
+  border-radius:999px;
+  padding:9px 12px;
+  background:#fff;
+}
+.v4-mode-buttons button.is-active{
+  background:var(--primary);
+  border-color:var(--primary);
+  color:#fff;
+}
+.v4-mode-select{
+  display:block;
+  max-width:360px;
+  margin:0 0 12px;
+  font-weight:900;
+  color:#334155;
+}
+.v4-mode-select select,
+.v4-calc-auto-box input,
+.v4-calc-auto-box select,
+.v4-calc-auto-box textarea{
+  margin-top:6px;
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:11px 12px;
+  font:inherit;
+  background:#fff;
+}
+.v4-option-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:10px;
+}
+.v4-option-row label{
+  display:inline-flex;
   align-items:center;
   gap:8px;
-  margin:0 0 12px;
-}
-.v4-template-buttons button,.v4-price-presets button{
-  padding:8px 10px;
+  border:1px solid var(--line);
   border-radius:999px;
-}
-.v4-price-presets span{
-  color:#64748b;
+  background:#fff;
+  padding:8px 10px;
   font-weight:900;
-  font-size:13px;
+  color:#334155;
+}
+.v4-option-row input{
+  width:auto;
+  margin:0;
+}
+.v4-calc-settings{
+  margin-top:12px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:#fff;
+  padding:10px;
+}
+.v4-calc-settings summary{
+  cursor:pointer;
+  font-weight:900;
+  color:#334155;
 }
 .v4-calc-live{
   display:flex;
@@ -161,6 +215,29 @@
 .v4-calc-live.is-error{
   border-color:#fecaca;
   background:#fef2f2;
+}
+.v4-estimate-lines{
+  flex-basis:100%;
+  display:grid;
+  gap:6px;
+  margin-top:4px;
+}
+.v4-estimate-lines div{
+  display:grid;
+  gap:3px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fff;
+  padding:8px;
+}
+.v4-estimate-lines b{
+  color:#0f172a;
+}
+.v4-estimate-lines span{
+  border:0;
+  padding:0;
+  color:#64748b;
+  background:transparent;
 }
 .v4-calc-total-panel{
   border:1px solid var(--line);
