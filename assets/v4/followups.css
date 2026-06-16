@@ -1,0 +1,112 @@
+.v4-followups-box{
+  margin:14px 0;
+}
+.v4-followups-box-inner{
+  border:1px solid #fed7aa;
+  border-radius:18px;
+  background:linear-gradient(135deg,#fff7ed 0%,#fff 78%);
+  padding:14px;
+  display:grid;
+  gap:12px;
+}
+.v4-followup-list{
+  display:grid;
+  gap:10px;
+}
+.v4-followup-item{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:12px;
+  align-items:center;
+  border:1px solid #e2e8f0;
+  border-radius:16px;
+  background:#fff;
+  padding:12px;
+}
+.v4-followup-item.is-overdue{
+  border-color:#fecaca;
+  background:#fff5f5;
+}
+.v4-followup-title{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  justify-content:space-between;
+}
+.v4-followup-title h4{
+  margin:0;
+  overflow-wrap:anywhere;
+}
+.v4-followup-title span{
+  border-radius:999px;
+  background:#ffedd5;
+  color:#9a3412;
+  padding:5px 8px;
+  font-size:12px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.v4-followup-item.is-overdue .v4-followup-title span{
+  background:#fee2e2;
+  color:#991b1b;
+}
+.v4-followup-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-top:8px;
+}
+.v4-followup-meta span{
+  border:1px solid #e2e8f0;
+  border-radius:999px;
+  background:#f8fafc;
+  color:#334155;
+  padding:5px 8px;
+  font-size:13px;
+}
+.v4-followup-actions{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  gap:8px;
+}
+.v4-followup-actions button{
+  border-radius:12px;
+  padding:9px 11px;
+}
+.v4-followup-missing-list{
+  border-top:1px dashed #fdba74;
+  padding-top:12px;
+}
+.v4-followup-missing-list h4{
+  margin:0 0 8px;
+}
+.v4-followup-missing-list > div{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.v4-followup-missing{
+  display:grid;
+  gap:2px;
+  text-align:left;
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  background:#fff;
+  padding:9px 11px;
+}
+.v4-followup-missing span{
+  color:#64748b;
+  font-size:12px;
+}
+@media(max-width:820px){
+  .v4-followup-item{
+    grid-template-columns:1fr;
+  }
+  .v4-followup-actions{
+    justify-content:stretch;
+  }
+  .v4-followup-actions button{
+    flex:1 1 auto;
+  }
+}
