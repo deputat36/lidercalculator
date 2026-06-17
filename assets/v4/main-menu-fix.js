@@ -46,13 +46,17 @@ function showOnly(tab) {
   }
 }
 
+function dispatchTabOpened(tab) {
+  document.dispatchEvent(new CustomEvent('leader-v4:tab-opened', { detail: { tab } }));
+}
+
 function shouldWarmTab(tab) {
   if (!LIST_TABS.includes(tab)) return false;
   if (warmedTabs.has(tab)) return false;
   const content = document.getElementById(`${SECTION_BY_TAB[tab]}Content`);
   if (!content) return true;
   const text = content.textContent || '';
-  return text.includes('Раздел загружается') || text.includes('Загружаю') || text.trim() === '';
+  return text.includes('Раздел загружается') || text.includes('Раздел производства загружается') || text.includes('Загружаю') || text.trim() === '';
 }
 
 function warmTabOnce(tab) {
@@ -66,6 +70,7 @@ function openTab(tab) {
   if (!tab) return;
   showOnly(tab);
   warmTabOnce(tab);
+  dispatchTabOpened(tab);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -145,9 +150,11 @@ window.v4SetTab = openTab;
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     showOnly(document.body.dataset.v4Tab || 'leads');
+    dispatchTabOpened(document.body.dataset.v4Tab || 'leads');
     scheduleSheetEnhance();
   });
 } else {
   showOnly(document.body.dataset.v4Tab || 'leads');
+  dispatchTabOpened(document.body.dataset.v4Tab || 'leads');
   scheduleSheetEnhance();
 }
