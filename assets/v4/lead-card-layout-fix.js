@@ -52,21 +52,13 @@ function cleanDuplicateLeadEditor() {
   else actions.insertAdjacentHTML('afterbegin', buttonHtml);
 }
 
-function addCardHints() {
-  const card = document.querySelector('#leadCardContent .v4-lead-card-view');
-  if (!card || document.getElementById('leadCardWorkHint')) return;
-  const guide = card.querySelector('.v4-workflow-guide');
-  if (!guide) return;
-  const hint = document.createElement('div');
-  hint.id = 'leadCardWorkHint';
-  hint.className = 'v4-subcard';
-  hint.innerHTML = '<h3>Порядок работы по заявке</h3><p>1. Проверьте контакт и задачу. 2. Заполните потребность. 3. Создайте типовой или нестандартный расчёт. 4. Сохраните расчёт. 5. Сформируйте КП. 6. После согласования создайте заказ.</p>';
-  guide.insertAdjacentElement('afterend', hint);
+function removeExtraHints() {
+  document.getElementById('leadCardWorkHint')?.remove();
 }
 
 function run() {
   reorderLeadCard();
-  addCardHints();
+  removeExtraHints();
   cleanDuplicateLeadEditor();
 }
 
