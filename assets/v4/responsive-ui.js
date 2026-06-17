@@ -2,15 +2,18 @@ import { supabaseClient } from './supabase-client.js';
 import { v4State } from './state.js';
 import { openLeadRoute } from './router.js';
 
-const SECTIONS = [
+const MENU_SECTIONS = [
   { key: 'leads', label: 'Заявки', id: 'leadsSection' },
   { key: 'orders', label: 'Заказы', id: 'ordersListSection', title: 'Заказы', description: 'Общий список заказов. Здесь видно, что находится в работе, что просрочено, что готово и что требует внимания.' },
   { key: 'clients', label: 'Клиенты', id: 'clientsSection', title: 'Клиенты', description: 'Список клиентов собирается из заявок: имя, телефон, город, источник и последняя активность.' },
   { key: 'calculations', label: 'Расчёты', id: 'calculationsListSection', title: 'Расчёты', description: 'Все сохранённые расчёты: сумма клиенту, прибыль, статус и связь с заявкой.' },
   { key: 'offers', label: 'КП', id: 'offersListSection', title: 'Коммерческие предложения', description: 'Все КП: черновики, отправленные, согласованные и отклонённые.' },
-  { key: 'card', label: 'Карточка', id: 'leadCardSection' },
   { key: 'catalog', label: 'Номенклатура', id: 'catalogSection' },
   { key: 'settings', label: 'Настройки', id: 'settingsSection', title: 'Настройки', description: 'Здесь будут настройки компании, печатного КП, доступов, статусов и шаблонов.' }
+];
+
+const INTERNAL_SECTIONS = [
+  { key: 'card', id: 'leadCardSection' }
 ];
 
 let currentTab = 'leads';
@@ -19,9 +22,10 @@ let clientsLoaded = false;
 let calculationsLoaded = false;
 let offersLoaded = false;
 let renderBusy = false;
+let eventsBound = false;
 
 function esc(value) {
-  return String(value ?? '').replace(/[&<>\"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 }
 
 function money(value) {
@@ -84,11 +88,6 @@ function workspace() {
   return document.getElementById('crmWorkspace') || document.querySelector('main') || document.body;
 }
 
-function sectionByKey(key) {
-  const item = SECTIONS.find((section) => section.key === key);
-  return item ? document.getElementById(item.id) : null;
-}
-
 function createGenericSection(section) {
   if (document.getElementById(section.id)) return document.getElementById(section.id);
   const el = document.createElement('section');
@@ -129,14 +128,18 @@ function createSettingsSection() {
 }
 
 function ensureSections() {
-  SECTIONS.forEach((section) => {
-    if (['leads', 'card', 'catalog'].includes(section.key)) {
+  MENU_SECTIONS.forEach((section) => {
+    if (['leads', 'catalog'].includes(section.key)) {
       const el = document.getElementById(section.id);
       if (el) el.dataset.v4ManagedSection = section.key;
       return;
     }
     if (section.key === 'settings') createSettingsSection();
     else createGenericSection(section);
+  });
+  INTERNAL_SECTIONS.forEach((section) => {
+    const el = document.getElementById(section.id);
+    if (el) el.dataset.v4ManagedSection = section.key;
   });
   document.querySelectorAll('.v4-next-card').forEach((el) => {
     el.dataset.v4ManagedSection = 'help';
@@ -146,11 +149,11 @@ function ensureSections() {
 function ensureMenu() {
   const nav = document.getElementById('v4LayoutTabs');
   if (!nav) return;
-  nav.innerHTML = '<b>Главное меню</b>' + SECTIONS.map((section) => `<button type="button" data-v4-tab-button="${esc(section.key)}">${esc(section.label)}</button>`).join('');
+  nav.innerHTML = '<b>Главное меню</b>' + MENU_SECTIONS.map((section) => `<button type="button" data-v4-tab-button="${esc(section.key)}">${esc(section.label)}</button>`).join('');
 }
 
 function setActiveTab(tab, options = {}) {
-  const allowed = new Set(SECTIONS.map((section) => section.key).concat(['help']));
+  const allowed = new Set(MENU_SECTIONS.map((section) => section.key).concat(['card', 'help']));
   currentTab = allowed.has(tab) ? tab : 'leads';
   document.body.dataset.v4Tab = currentTab;
   document.querySelectorAll('[data-v4-tab-button]').forEach((btn) => {
@@ -282,7 +285,7 @@ async function loadCurrentList(tab) {
     if (tab === 'calculations') await renderCalculationsList();
     if (tab === 'offers') await renderOffersList();
   } catch (error) {
-    const section = SECTIONS.find((item) => item.key === tab);
+    const section = MENU_SECTIONS.find((item) => item.key === tab);
     if (section) setContent(section.id, `<div class="v4-empty is-error">Ошибка загрузки раздела: ${esc(error.message || error)}</div>`);
   } finally {
     renderBusy = false;
@@ -290,6 +293,8 @@ async function loadCurrentList(tab) {
 }
 
 function bindEvents() {
+  if (eventsBound) return;
+  eventsBound = true;
   document.addEventListener('click', (event) => {
     const tabButton = event.target.closest('[data-v4-tab-button]');
     if (tabButton) {
