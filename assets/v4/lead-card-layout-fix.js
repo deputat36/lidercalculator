@@ -6,10 +6,17 @@ function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 }
 
+function visualBlock(node) {
+  if (!node) return null;
+  return node.closest('details[data-lead-accordion="1"]') || node;
+}
+
 function moveAfter(node, anchor) {
-  if (!node || !anchor || !anchor.parentNode) return;
-  if (anchor.nextElementSibling === node) return;
-  anchor.insertAdjacentElement('afterend', node);
+  const visualNode = visualBlock(node);
+  const visualAnchor = visualBlock(anchor);
+  if (!visualNode || !visualAnchor || visualNode === visualAnchor || !visualAnchor.parentNode) return;
+  if (visualAnchor.nextElementSibling === visualNode) return;
+  visualAnchor.insertAdjacentElement('afterend', visualNode);
 }
 
 function reorderLeadCard() {
