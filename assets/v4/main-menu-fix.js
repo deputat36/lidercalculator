@@ -14,7 +14,7 @@ const SECTION_BY_TAB = {
 const LIST_TABS = ['orders', 'production', 'clients', 'calculations', 'offers'];
 const warmedTabs = new Set();
 let sheetPrintAutoTouched = false;
-let productionBoardV2Loading = null;
+let productionBoardLoading = null;
 
 function ensureManagedSections() {
   Object.entries(SECTION_BY_TAB).forEach(([tab, id]) => {
@@ -47,9 +47,9 @@ function showOnly(tab) {
   }
 }
 
-function loadProductionBoardV2() {
-  if (productionBoardV2Loading) return productionBoardV2Loading;
-  productionBoardV2Loading = import('./production-board-v2.js?v=20260617-1')
+function loadProductionBoardV3() {
+  if (productionBoardLoading) return productionBoardLoading;
+  productionBoardLoading = import('./production-board-v3.js?v=20260617-1')
     .then((module) => {
       if (document.body.dataset.v4Tab === 'production' && typeof module.loadProductionBoard === 'function') {
         return module.loadProductionBoard(false);
@@ -57,15 +57,15 @@ function loadProductionBoardV2() {
       return null;
     })
     .catch((error) => {
-      productionBoardV2Loading = null;
+      productionBoardLoading = null;
       const box = document.getElementById('productionBoardSectionContent');
       if (box) box.innerHTML = `<div class="v4-empty is-error">Ошибка подключения производства: ${String(error?.message || error)}</div>`;
     });
-  return productionBoardV2Loading;
+  return productionBoardLoading;
 }
 
 function dispatchTabOpened(tab) {
-  if (tab === 'production') loadProductionBoardV2();
+  if (tab === 'production') loadProductionBoardV3();
   document.dispatchEvent(new CustomEvent('leader-v4:tab-opened', { detail: { tab } }));
 }
 
@@ -165,7 +165,7 @@ window.addEventListener('leader-v4:force-tab', (event) => {
 
 window.leaderV4OpenTab = openTab;
 window.v4SetTab = openTab;
-window.LeaderV4LoadProductionBoard = loadProductionBoardV2;
+window.LeaderV4LoadProductionBoard = loadProductionBoardV3;
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
