@@ -128,7 +128,7 @@ html,body{max-width:100%;overflow-x:hidden!important}.v4-shell{width:100%;max-wi
 <script type="module" src="assets/v4/lead-timeline-hooks.js?v=20260616-1"></script>
 <script type="module" src="assets/v4/needs.js?v=20260528-1"></script>
 <script type="module" src="assets/v4/calculations-catalog.js?v=20260616-1"></script>
-<script type="module" src="assets/v4/calculations-standard.js?v=20260617-1"></script>
+<script type="module" src="assets/v4/calculations-standard.js?v=20260617-2"></script>
 <script type="module" src="assets/v4/calculations-advanced.js?v=20260617-1"></script>
 <script type="module" src="assets/v4/calculations-saved-tools.js?v=20260616-2"></script>
 <script type="module" src="assets/v4/offer-print.js?v=20260616-1"></script>
@@ -141,7 +141,7 @@ html,body{max-width:100%;overflow-x:hidden!important}.v4-shell{width:100%;max-wi
   function setTab(tab){
     document.body.dataset.v4Tab = tab;
     document.querySelectorAll('[data-v4-tab-button]').forEach(function(btn){
-      btn.classList.toggle('is-active', btn.dataset.v4TabButton === tab);
+      btn.classList.toggle('is-active', btn.datasetV4TabButton === tab);
     });
   }
   document.addEventListener('click', function(event){
