@@ -77,6 +77,11 @@ function encode(value) {
   return encodeURIComponent(value);
 }
 
+function encodeInValue(value) {
+  if (value === null || value === undefined) return 'null';
+  return String(value).replace(/"/g, '\\"');
+}
+
 function preferHeader(values) {
   return values.filter(Boolean).join(',');
 }
@@ -102,6 +107,17 @@ class QueryBuilder {
 
   eq(column, value) {
     this.filters.push(`${encode(column)}=eq.${encode(value)}`);
+    return this;
+  }
+
+  in(column, values = []) {
+    const list = Array.isArray(values) ? values : [values];
+    if (!list.length) {
+      this.filters.push(`${encode(column)}=in.()`);
+      return this;
+    }
+    const encoded = list.map((value) => `"${encodeInValue(value)}"`).join(',');
+    this.filters.push(`${encode(column)}=in.(${encoded})`);
     return this;
   }
 
@@ -219,7 +235,7 @@ export const supabaseClient = {
       }
     },
     async signOut() {
-      await timeout(Promise.resolve(clearSession()), V4_CONFIG.timeouts.logoutMs, 'Выход не завершился вовремя');
+      clearSession();
       return { error: null };
     }
   },
@@ -229,5 +245,8 @@ export const supabaseClient = {
   rpc
 };
 
-window.LeaderV4 = window.LeaderV4 || {};
-window.LeaderV4.supabase = supabaseClient;
+export async function requireSession() {
+  const { data } = await supabaseClient.auth.getSession();
+  if (!data.session) throw new Error('Нужно войти в CRM');
+  return data.session;
+}
