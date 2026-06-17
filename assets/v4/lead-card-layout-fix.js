@@ -1,0 +1,53 @@
+function moveAfter(node, anchor) {
+  if (!node || !anchor || !anchor.parentNode) return;
+  if (anchor.nextElementSibling === node) return;
+  anchor.insertAdjacentElement('afterend', node);
+}
+
+function reorderLeadCard() {
+  const card = document.querySelector('#leadCardContent .v4-lead-card-view');
+  if (!card) return;
+  const calculations = document.getElementById('calculationsBox');
+  const standard = document.getElementById('standardCalculationsBox');
+  const advanced = document.getElementById('advancedCalculationsBox');
+  const offers = document.getElementById('offersBox');
+
+  if (calculations) {
+    calculations.classList.add('v4-card-block-saved-calculations');
+  }
+  if (standard && calculations) moveAfter(standard, calculations);
+  if (advanced && standard) moveAfter(advanced, standard);
+  else if (advanced && calculations) moveAfter(advanced, calculations);
+  if (offers && advanced) moveAfter(offers, advanced);
+  else if (offers && standard) moveAfter(offers, standard);
+
+  const oldCalcForm = document.querySelector('#calculationsBox .v4-calc-form, #calculationsBox [data-catalog-calculator]');
+  if (oldCalcForm) oldCalcForm.remove();
+}
+
+function addCardHints() {
+  const card = document.querySelector('#leadCardContent .v4-lead-card-view');
+  if (!card || document.getElementById('leadCardWorkHint')) return;
+  const guide = card.querySelector('.v4-workflow-guide');
+  if (!guide) return;
+  const hint = document.createElement('div');
+  hint.id = 'leadCardWorkHint';
+  hint.className = 'v4-subcard';
+  hint.innerHTML = '<h3>Порядок работы по заявке</h3><p>1. Проверьте контакт и задачу. 2. Заполните потребность. 3. Создайте типовой или нестандартный расчёт. 4. Сохраните расчёт. 5. Сформируйте КП. 6. После согласования создайте заказ.</p>';
+  guide.insertAdjacentElement('afterend', hint);
+}
+
+function run() {
+  reorderLeadCard();
+  addCardHints();
+}
+
+document.addEventListener('leader-v4:lead-card-rendered', () => {
+  setTimeout(run, 80);
+  setTimeout(run, 300);
+});
+document.addEventListener('leader-v4:route-change', () => {
+  setTimeout(run, 120);
+});
+document.addEventListener('DOMContentLoaded', run);
+setInterval(run, 1500);
