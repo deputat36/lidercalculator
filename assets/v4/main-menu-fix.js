@@ -12,6 +12,7 @@ const SECTION_BY_TAB = {
 
 const LIST_TABS = ['orders', 'clients', 'calculations', 'offers'];
 const warmedTabs = new Set();
+let sheetPrintAutoTouched = false;
 
 function ensureManagedSections() {
   Object.entries(SECTION_BY_TAB).forEach(([tab, id]) => {
@@ -67,6 +68,44 @@ function openTab(tab) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function enhanceSheetPrintOption() {
+  const box = document.getElementById('standardCalculationsBox');
+  if (!box) return;
+  const mode = document.getElementById('stdMode')?.value;
+  const print = document.getElementById('stdSheetPrint');
+  const lamination = document.getElementById('stdSheetLamination');
+  const preview = document.getElementById('stdCalcPreview');
+  if (mode !== 'sheet' || !print || !preview) return;
+
+  if (!sheetPrintAutoTouched) {
+    print.checked = true;
+    if (lamination) lamination.checked = true;
+    sheetPrintAutoTouched = true;
+    print.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  let notice = document.getElementById('stdSheetPrintNotice');
+  if (!notice) {
+    notice = document.createElement('div');
+    notice.id = 'stdSheetPrintNotice';
+    notice.style.cssText = 'margin:10px 0;border:1px solid #bfdbfe;background:#eff6ff;color:#1e3a8a;border-radius:14px;padding:10px 12px;font-weight:900;line-height:1.45';
+    preview.insertAdjacentElement('beforebegin', notice);
+  }
+  notice.innerHTML = '✓ Печать на плёнке такого же размера включена. При добавлении позиции CRM создаст отдельную строку плёнки по тем же ширине, высоте и количеству. Накатку можно оставить включённой или снять галочку ниже.';
+
+  const label = print.closest('label');
+  if (label) {
+    label.style.background = '#dcfce7';
+    label.style.borderColor = '#86efac';
+    label.style.color = '#166534';
+  }
+}
+
+function scheduleSheetEnhance() {
+  setTimeout(enhanceSheetPrintOption, 60);
+  setTimeout(enhanceSheetPrintOption, 250);
+}
+
 document.addEventListener('click', (event) => {
   const button = event.target.closest?.('[data-v4-tab-button]');
   if (!button) return;
@@ -78,6 +117,23 @@ document.addEventListener('click', (event) => {
   openTab(tab);
 }, true);
 
+document.addEventListener('click', (event) => {
+  if (event.target.closest?.('[data-std-mode="sheet"]')) {
+    sheetPrintAutoTouched = false;
+    scheduleSheetEnhance();
+  }
+});
+
+document.addEventListener('change', (event) => {
+  if (event.target?.id === 'stdMode' || event.target?.id === 'stdSheetPrint') scheduleSheetEnhance();
+});
+
+document.addEventListener('leader-v4:lead-card-rendered', scheduleSheetEnhance);
+document.addEventListener('leader-v4:route-change', () => {
+  sheetPrintAutoTouched = false;
+  scheduleSheetEnhance();
+});
+
 window.addEventListener('leader-v4:force-tab', (event) => {
   openTab(event.detail?.tab || 'leads');
 });
@@ -85,7 +141,11 @@ window.addEventListener('leader-v4:force-tab', (event) => {
 window.leaderV4OpenTab = openTab;
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => showOnly(document.body.dataset.v4Tab || 'leads'));
+  document.addEventListener('DOMContentLoaded', () => {
+    showOnly(document.body.dataset.v4Tab || 'leads');
+    scheduleSheetEnhance();
+  });
 } else {
   showOnly(document.body.dataset.v4Tab || 'leads');
+  scheduleSheetEnhance();
 }
