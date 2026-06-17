@@ -10,6 +10,9 @@ const SECTION_BY_TAB = {
   orderCard: 'orderCardSection'
 };
 
+const LIST_TABS = ['orders', 'clients', 'calculations', 'offers'];
+const warmedTabs = new Set();
+
 function ensureManagedSections() {
   Object.entries(SECTION_BY_TAB).forEach(([tab, id]) => {
     const el = document.getElementById(id);
@@ -41,8 +44,18 @@ function showOnly(tab) {
   }
 }
 
-function triggerRefresh(tab) {
-  if (!['orders', 'clients', 'calculations', 'offers'].includes(tab)) return;
+function shouldWarmTab(tab) {
+  if (!LIST_TABS.includes(tab)) return false;
+  if (warmedTabs.has(tab)) return false;
+  const content = document.getElementById(`${SECTION_BY_TAB[tab]}Content`);
+  if (!content) return true;
+  const text = content.textContent || '';
+  return text.includes('Раздел загружается') || text.includes('Загружаю') || text.trim() === '';
+}
+
+function warmTabOnce(tab) {
+  if (!shouldWarmTab(tab)) return;
+  warmedTabs.add(tab);
   const button = document.querySelector(`[data-v4-list-refresh="${tab}"]`);
   if (button) button.click();
 }
@@ -50,7 +63,7 @@ function triggerRefresh(tab) {
 function openTab(tab) {
   if (!tab) return;
   showOnly(tab);
-  triggerRefresh(tab);
+  warmTabOnce(tab);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
