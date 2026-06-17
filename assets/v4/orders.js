@@ -74,8 +74,63 @@ function offerOptions(selectedId = '') {
   ].join('');
 }
 
+function layoutStatus(order) {
+  return order.layout_status || order.data?.layout_status || order.data?.layoutStatus || 'Макета нет';
+}
+
+function isDeadlineOverdue(order) {
+  if (!order.deadline) return false;
+  const deadline = new Date(order.deadline);
+  if (Number.isNaN(deadline.getTime())) return false;
+  deadline.setHours(23, 59, 59, 999);
+  return deadline < new Date() && !['Готово', 'Выдано', 'Закрыт', 'Отменён'].includes(order.status || '');
+}
+
+function orderChecklistItems(order) {
+  const status = order.status || 'Новый';
+  const pay = order.payment_status || 'Не оплачено';
+  const layout = layoutStatus(order);
+  const hasDeadline = Boolean(order.deadline);
+  const overdue = isDeadlineOverdue(order);
+  const paid = !['Не оплачено', 'Нет оплаты', 'Ожидается', ''].includes(pay);
+  const layoutDone = ['Согласован', 'Макет согласован', 'Готов'].includes(layout);
+  const productionStarted = ['В производстве', 'Готово', 'Выдано', 'Закрыт'].includes(status);
+  const ready = ['Готово', 'Выдано', 'Закрыт'].includes(status);
+  const issued = ['Выдано', 'Закрыт'].includes(status);
+  return [
+    { title: 'Заказ создан', text: status, done: true },
+    { title: 'Макет', text: layout, done: layoutDone, warn: !layoutDone },
+    { title: 'Оплата', text: pay, done: paid, warn: !paid },
+    { title: 'Срок', text: hasDeadline ? formatDate(order.deadline) : 'Срок не указан', done: hasDeadline && !overdue, danger: overdue, warn: !hasDeadline },
+    { title: 'Производство', text: productionStarted ? status : 'Ещё не в производстве', done: productionStarted, warn: !productionStarted },
+    { title: 'Готовность', text: ready ? status : 'Не готово', done: ready, warn: !ready },
+    { title: 'Выдача клиенту', text: issued ? status : 'Не выдано', done: issued, warn: !issued }
+  ];
+}
+
+function renderOrderChecklist(order) {
+  const items = orderChecklistItems(order);
+  const done = items.filter((item) => item.done).length;
+  const percent = Math.round((done / items.length) * 100);
+  return `
+    <div class="v4-order-progress">
+      <div class="v4-order-progress-head">
+        <span>Готовность заказа</span>
+        <b>${percent}%</b>
+      </div>
+      <div class="v4-order-progress-bar"><span style="width:${percent}%"></span></div>
+      <div class="v4-order-checklist">
+        ${items.map((item) => {
+          const cls = item.done ? 'is-done' : item.danger ? 'is-danger' : item.warn ? 'is-warn' : '';
+          return `<div class="v4-order-check ${cls}"><b>${item.done ? '✓ ' : item.danger ? '! ' : '• '}${esc(item.title)}</b><span>${esc(item.text)}</span></div>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function renderOrderCard(order) {
-  const orderType = order.data?.order_type || '—';
+  const orderType = order.data?.order_type || order.order_type || '—';
   return `
     <article class="v4-order-card">
       <div class="v4-order-title-row">
@@ -87,6 +142,7 @@ function renderOrderCard(order) {
         <span><b>Телефон:</b> ${esc(order.client_phone || '—')}</span>
         <span><b>Тип:</b> ${esc(orderType)}</span>
         <span><b>Срок:</b> ${formatDate(order.deadline)}</span>
+        <span><b>Макет:</b> ${esc(layoutStatus(order))}</span>
       </div>
       <div class="v4-order-kpi">
         <div><span>Клиенту</span><b>${money(order.client_total)}</b></div>
@@ -94,6 +150,7 @@ function renderOrderCard(order) {
         <div><span>Прибыль</span><b>${money(order.profit)}</b></div>
         <div><span>Оплата</span><b>${esc(order.payment_status || 'Не оплачено')}</b></div>
       </div>
+      ${renderOrderChecklist(order)}
     </article>
   `;
 }
@@ -155,7 +212,7 @@ export function renderOrders() {
       <div class="v4-subcard-head">
         <div>
           <h3>Заказ</h3>
-          <p>Заказ создаётся только из согласованного КП и сохранённого расчёта.</p>
+          <p>Заказ создаётся только из согласованного КП и сохранённого расчёта. После создания контролируйте макет, оплату, производство, срок и выдачу.</p>
         </div>
         <span class="v4-muted">Заказов: ${orders.length}</span>
       </div>
