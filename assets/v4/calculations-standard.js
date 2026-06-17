@@ -106,16 +106,17 @@ function modeFields(mode) {
   }
   if (mode === 'sheet') {
     return `
-      <div class="v4-calc-mode-help"><b>Листовой материал:</b> ПВХ, композит, металл, таблички и основы. Можно добавить печать/накатку и резку.</div>
+      <div class="v4-calc-mode-help"><b>Листовой материал:</b> ПВХ, композит, металл, таблички и основы. Можно сразу добавить печать на самоклеящейся плёнке такого же размера и накатку этой плёнки на лист.</div>
       <div class="v4-form-grid">
         <label>Материал<select id="stdSheetMaterial"><option value="1400">ПВХ 3 мм — себ. 1400 ₽/м²</option><option value="2150">ПВХ 5 мм — себ. 2150 ₽/м²</option><option value="4400">ПВХ 10 мм — себ. 4400 ₽/м²</option><option value="7600">ПВХ 20 мм — себ. 7600 ₽/м²</option><option value="1500">Листовой металл/железо — себ. 1500 ₽/м²</option></select></label>
         <label>Ширина, м<input id="stdWidth" type="number" step="0.01" min="0"></label>
         <label>Высота, м<input id="stdHeight" type="number" step="0.01" min="0"></label>
         <label>Количество<input id="stdQty" type="number" step="1" min="1" value="1"></label>
-        <label>Печать/накатка, ₽/м²<input id="stdSheetPrintCost" type="number" value="650"></label>
+        <label>Плёнка с печатью<select id="stdSheetPrintFilm"><option value="550">Самоклеящаяся плёнка с печатью — себ. 550 ₽/м²</option><option value="750">Перфорированная плёнка OWV — себ. 750 ₽/м²</option><option value="700">Цветная/плоттерная плёнка — себ. 700 ₽/м²</option></select></label>
+        <label>Накатка плёнки, ₽/м²<input id="stdSheetLaminationCost" type="number" value="250"></label>
         <label>Резка, ₽/шт<input id="stdSheetCutCost" type="number" value="180"></label>
       </div>
-      <div class="v4-option-row"><label><input id="stdSheetPrint" type="checkbox"> Добавить печать / накатку</label><label><input id="stdSheetCut" type="checkbox"> Добавить резку</label></div>`;
+      <div class="v4-option-row"><label><input id="stdSheetPrint" type="checkbox"> Добавить плёнку с печатью такого же размера</label><label><input id="stdSheetLamination" type="checkbox"> Добавить накатку плёнки на лист</label><label><input id="stdSheetCut" type="checkbox"> Добавить резку</label></div>`;
   }
   return `
     <div class="v4-calc-mode-help"><b>Отдельная услуга:</b> дизайн, монтаж, доставка, выезд, замер. Удобно добавлять в расчёт отдельной строкой.</div>
@@ -166,7 +167,29 @@ function currentItems() {
     if (a <= 0) return [];
     const cost = num(val('stdSheetMaterial')) || 1400;
     result.push(item({ category: 'Листовые материалы', name: `Листовой материал ${width}×${height} м · ${qty} шт`, unit: 'м²', qty: a, contractor: cost, comment: `Площадь ${a.toFixed(2)} м²`, data: { mode, width, height, pieces: qty } }));
-    if (checked('stdSheetPrint')) result.push(item({ category: 'Печать', name: 'Печать / накатка на листовой материал', unit: 'м²', qty: a, contractor: num(val('stdSheetPrintCost')) || 650, comment: `Площадь ${a.toFixed(2)} м²`, data: { mode: 'sheet_print' } }));
+    if (checked('stdSheetPrint')) {
+      result.push(item({
+        category: 'Плёнка',
+        name: `Печать на плёнке ${width}×${height} м · ${qty} шт`,
+        unit: 'м²',
+        qty: a,
+        contractor: num(val('stdSheetPrintFilm')) || 550,
+        comment: `Плёнка такого же размера, как листовой материал. Площадь ${a.toFixed(2)} м²`,
+        data: { mode: 'sheet_print_film', width, height, pieces: qty, same_size_as_sheet: true }
+      }));
+    }
+    if (checked('stdSheetLamination')) {
+      result.push(item({
+        category: 'Накатка',
+        type: 'Услуга',
+        name: `Накатка плёнки на лист ${width}×${height} м · ${qty} шт`,
+        unit: 'м²',
+        qty: a,
+        contractor: num(val('stdSheetLaminationCost')) || 250,
+        comment: `Накатка плёнки на листовой материал такого же размера. Площадь ${a.toFixed(2)} м²`,
+        data: { mode: 'sheet_film_lamination', width, height, pieces: qty, same_size_as_sheet: true }
+      }));
+    }
     if (checked('stdSheetCut')) result.push(item({ category: 'Резка', type: 'Услуга', name: 'Резка листового материала', unit: 'шт', qty, contractor: num(val('stdSheetCutCost')) || 180, comment: `${qty} шт`, data: { mode: 'sheet_cut' } }));
   }
   if (mode === 'service') {
