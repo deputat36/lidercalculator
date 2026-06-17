@@ -28,10 +28,6 @@ function money(value) {
   const number = Number(value || 0);
   return number ? `${Math.round(number).toLocaleString('ru-RU')} ₽` : '—';
 }
-function dateRu(value) {
-  if (!value) return '—';
-  try { return new Date(value).toLocaleDateString('ru-RU'); } catch (_) { return String(value); }
-}
 function dateTimeRu(value) {
   if (!value) return '—';
   try { return new Date(value).toLocaleString('ru-RU'); } catch (_) { return String(value); }
@@ -97,8 +93,8 @@ function content() {
 }
 async function fetchData() {
   const [productionResponse, installationResponse] = await Promise.all([
-    supabaseClient.from('leader_production_jobs').select('*').order('deadline', { ascending: true, nullsFirst: false }).limit(150),
-    supabaseClient.from('leader_installation_jobs').select('*').order('scheduled_at', { ascending: true, nullsFirst: false }).limit(150)
+    supabaseClient.from('leader_production_jobs').select('*').order('deadline', { ascending: true }).limit(150),
+    supabaseClient.from('leader_installation_jobs').select('*').order('scheduled_at', { ascending: true }).limit(150)
   ]);
   if (productionResponse.error) throw productionResponse.error;
   if (installationResponse.error) throw installationResponse.error;
@@ -123,7 +119,7 @@ function renderCard(job, kind, order) {
   const date = kind === 'production' ? (job.deadline || order?.deadline) : job.scheduled_at;
   const overdue = isOverdue(date) && !String(status || '').toLowerCase().includes('готов') && !String(status || '').toLowerCase().includes('выполн');
   const file = kind === 'production' ? job.file_url : (job.before_photo_url || job.after_photo_url);
-  return `<article class="v4-production-card ${overdue ? 'is-overdue' : ''}"><div class="v4-production-card-head"><b>${esc(job.title || order?.project_name || 'Задание')}</b><span class="v4-production-badge ${statusClass(status)}">${esc(status || '—')}</span></div><div class="v4-production-meta"><span>Заказ: №${esc(order?.order_number || String(job.order_id || '').slice(0, 8))} — ${esc(order?.project_name || '—')}</span><span>${kind === 'production' ? 'Срок' : 'Монтаж'}: ${kind === 'production' ? dateTimeRu(date) : dateTimeRu(date)}</span>${kind === 'production' ? `<span>Макет: ${esc(job.layout_status || order?.layout_status || '—')}</span><span>Себестоимость: ${money(job.contractor_cost || order?.contractor_cost)}</span>` : `<span>Адрес: ${esc(job.address || order?.data?.install_place || '—')}</span><span>Монтажник: ${esc(job.installer_name || '—')}</span>`}${overdue ? '<span style="color:#991b1b;font-weight:900">Просрочено</span>' : ''}</div>${file ? `<a class="v4-production-link" href="${esc(file)}" target="_blank" rel="noopener">Открыть файл / фото</a>` : ''}<div class="v4-production-card-actions"><button type="button" data-open-order="${esc(job.order_id)}">Открыть заказ</button>${kind === 'production' ? `<button type="button" data-board-production-status="${esc(job.id)}" data-status="В работе">В работу</button><button type="button" class="v4-primary" data-board-production-status="${esc(job.id)}" data-status="Готово">Готово</button>` : `<button type="button" data-board-install-status="${esc(job.id)}" data-status="В работе">В работу</button><button type="button" class="v4-primary" data-board-install-status="${esc(job.id)}" data-status="Выполнен">Выполнен</button>`}</div></article>`;
+  return `<article class="v4-production-card ${overdue ? 'is-overdue' : ''}"><div class="v4-production-card-head"><b>${esc(job.title || order?.project_name || 'Задание')}</b><span class="v4-production-badge ${statusClass(status)}">${esc(status || '—')}</span></div><div class="v4-production-meta"><span>Заказ: №${esc(order?.order_number || String(job.order_id || '').slice(0, 8))} — ${esc(order?.project_name || '—')}</span><span>${kind === 'production' ? 'Срок' : 'Монтаж'}: ${dateTimeRu(date)}</span>${kind === 'production' ? `<span>Макет: ${esc(job.layout_status || order?.layout_status || '—')}</span><span>Себестоимость: ${money(job.contractor_cost || order?.contractor_cost)}</span>` : `<span>Адрес: ${esc(job.address || order?.data?.install_place || '—')}</span><span>Монтажник: ${esc(job.installer_name || '—')}</span>`}${overdue ? '<span style="color:#991b1b;font-weight:900">Просрочено</span>' : ''}</div>${file ? `<a class="v4-production-link" href="${esc(file)}" target="_blank" rel="noopener">Открыть файл / фото</a>` : ''}<div class="v4-production-card-actions"><button type="button" data-open-order="${esc(job.order_id)}">Открыть заказ</button>${kind === 'production' ? `<button type="button" data-board-production-status="${esc(job.id)}" data-status="В работе">В работу</button><button type="button" class="v4-primary" data-board-production-status="${esc(job.id)}" data-status="Готово">Готово</button>` : `<button type="button" data-board-install-status="${esc(job.id)}" data-status="В работе">В работу</button><button type="button" class="v4-primary" data-board-install-status="${esc(job.id)}" data-status="Выполнен">Выполнен</button>`}</div></article>`;
 }
 function renderColumns(items, kind, query, statusFilter) {
   const cols = kind === 'production' ? PRODUCTION_COLUMNS : INSTALL_COLUMNS;
@@ -226,9 +222,9 @@ function boot() {
   ensureStyles();
   ensureSection();
   ensureMenuButton();
-  document.addEventListener('leader-v4:crm-ready', () => { ensureSection(); ensureMenuButton(); });
+  document.addEventListener('leader-v4:crm-ready', () => { ensureSection(); ensureMenuButton(); if (document.body.dataset.v4Tab === 'production') loadProductionBoard(false); });
+  document.addEventListener('leader-v4:tab-opened', (event) => { if (event.detail?.tab === 'production') setTimeout(() => loadProductionBoard(false), 80); });
   document.addEventListener('click', (event) => {
-    if (event.target.closest?.('[data-v4-tab-button="production"]')) setTimeout(() => loadProductionBoard(false), 120);
     const refresh = event.target.closest?.('[data-v4-list-refresh="production"]');
     if (refresh) { event.preventDefault(); loaded = false; loadProductionBoard(true); return; }
     const kind = event.target.closest?.('[data-production-board-kind]');
@@ -244,5 +240,6 @@ function boot() {
   document.addEventListener('change', (event) => {
     if (event.target?.id === 'productionBoardStatus') renderBoard(document.body.dataset.productionBoardKind || 'production');
   });
+  if (document.body.dataset.v4Tab === 'production') setTimeout(() => loadProductionBoard(false), 250);
 }
 boot();
