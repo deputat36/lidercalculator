@@ -1,3 +1,11 @@
+import './lead-card-accordion.js?v=20260617-1';
+
+let currentLeadId = null;
+
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+}
+
 function moveAfter(node, anchor) {
   if (!node || !anchor || !anchor.parentNode) return;
   if (anchor.nextElementSibling === node) return;
@@ -12,9 +20,7 @@ function reorderLeadCard() {
   const advanced = document.getElementById('advancedCalculationsBox');
   const offers = document.getElementById('offersBox');
 
-  if (calculations) {
-    calculations.classList.add('v4-card-block-saved-calculations');
-  }
+  if (calculations) calculations.classList.add('v4-card-block-saved-calculations');
   if (standard && calculations) moveAfter(standard, calculations);
   if (advanced && standard) moveAfter(advanced, standard);
   else if (advanced && calculations) moveAfter(advanced, calculations);
@@ -23,6 +29,20 @@ function reorderLeadCard() {
 
   const oldCalcForm = document.querySelector('#calculationsBox .v4-calc-form, #calculationsBox [data-catalog-calculator]');
   if (oldCalcForm) oldCalcForm.remove();
+}
+
+function cleanDuplicateLeadEditor() {
+  document.getElementById('editLeadBtn')?.remove();
+  document.getElementById('leadEditBox')?.remove();
+
+  const actions = document.querySelector('#leadCardContent .v4-card-view-actions');
+  const leadId = currentLeadId || window.LeaderV4CurrentLeadId || document.body.dataset.currentLeadId;
+  if (!actions || !leadId || actions.querySelector('[data-edit-type="lead"]')) return;
+
+  const refresh = document.getElementById('refreshLeadBtn');
+  const buttonHtml = `<button type="button" data-edit-type="lead" data-edit-id="${esc(leadId)}">Редактировать заявку</button>`;
+  if (refresh) refresh.insertAdjacentHTML('beforebegin', buttonHtml);
+  else actions.insertAdjacentHTML('afterbegin', buttonHtml);
 }
 
 function addCardHints() {
@@ -40,14 +60,27 @@ function addCardHints() {
 function run() {
   reorderLeadCard();
   addCardHints();
+  cleanDuplicateLeadEditor();
 }
 
-document.addEventListener('leader-v4:lead-card-rendered', () => {
+document.addEventListener('leader-v4:lead-card-rendered', (event) => {
+  if (event.detail?.leadId) {
+    currentLeadId = event.detail.leadId;
+    window.LeaderV4CurrentLeadId = currentLeadId;
+    document.body.dataset.currentLeadId = currentLeadId;
+  }
   setTimeout(run, 80);
   setTimeout(run, 300);
+  setTimeout(run, 900);
 });
-document.addEventListener('leader-v4:route-change', () => {
+document.addEventListener('leader-v4:route-change', (event) => {
+  if (event.detail?.leadId) {
+    currentLeadId = event.detail.leadId;
+    window.LeaderV4CurrentLeadId = currentLeadId;
+    document.body.dataset.currentLeadId = currentLeadId;
+  }
   setTimeout(run, 120);
+  setTimeout(run, 500);
 });
 document.addEventListener('DOMContentLoaded', run);
 setInterval(run, 1500);
