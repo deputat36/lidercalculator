@@ -14,6 +14,7 @@ const SECTION_BY_TAB = {
 const LIST_TABS = ['orders', 'production', 'clients', 'calculations', 'offers'];
 const warmedTabs = new Set();
 let sheetPrintAutoTouched = false;
+let productionBoardV2Loading = null;
 
 function ensureManagedSections() {
   Object.entries(SECTION_BY_TAB).forEach(([tab, id]) => {
@@ -46,7 +47,25 @@ function showOnly(tab) {
   }
 }
 
+function loadProductionBoardV2() {
+  if (productionBoardV2Loading) return productionBoardV2Loading;
+  productionBoardV2Loading = import('./production-board-v2.js?v=20260617-1')
+    .then((module) => {
+      if (document.body.dataset.v4Tab === 'production' && typeof module.loadProductionBoard === 'function') {
+        return module.loadProductionBoard(false);
+      }
+      return null;
+    })
+    .catch((error) => {
+      productionBoardV2Loading = null;
+      const box = document.getElementById('productionBoardSectionContent');
+      if (box) box.innerHTML = `<div class="v4-empty is-error">Ошибка подключения производства: ${String(error?.message || error)}</div>`;
+    });
+  return productionBoardV2Loading;
+}
+
 function dispatchTabOpened(tab) {
+  if (tab === 'production') loadProductionBoardV2();
   document.dispatchEvent(new CustomEvent('leader-v4:tab-opened', { detail: { tab } }));
 }
 
@@ -146,6 +165,7 @@ window.addEventListener('leader-v4:force-tab', (event) => {
 
 window.leaderV4OpenTab = openTab;
 window.v4SetTab = openTab;
+window.LeaderV4LoadProductionBoard = loadProductionBoardV2;
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
