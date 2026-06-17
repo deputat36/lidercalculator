@@ -68,6 +68,73 @@
   display:block;
   margin-top:5px;
 }
+.v4-order-progress{
+  border:1px solid #dbeafe;
+  border-radius:16px;
+  background:#fff;
+  padding:12px;
+  margin-top:12px;
+}
+.v4-order-progress-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  margin-bottom:8px;
+  font-weight:900;
+}
+.v4-order-progress-bar{
+  height:10px;
+  border-radius:999px;
+  background:#e2e8f0;
+  overflow:hidden;
+}
+.v4-order-progress-bar span{
+  display:block;
+  height:100%;
+  border-radius:999px;
+  background:linear-gradient(90deg,#2563eb,#22c55e);
+}
+.v4-order-checklist{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));
+  gap:8px;
+  margin-top:12px;
+}
+.v4-order-check{
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  background:#fff;
+  padding:10px;
+}
+.v4-order-check b{
+  display:block;
+  color:#0f172a;
+}
+.v4-order-check span{
+  display:block;
+  margin-top:4px;
+  color:#64748b;
+  font-size:12px;
+}
+.v4-order-check.is-done{
+  border-color:#bbf7d0;
+  background:#f0fdf4;
+}
+.v4-order-check.is-done b{
+  color:#166534;
+}
+.v4-order-check.is-warn{
+  border-color:#fde68a;
+  background:#fffbeb;
+}
+.v4-order-check.is-danger{
+  border-color:#fecaca;
+  background:#fef2f2;
+}
+.v4-order-check.is-danger b{
+  color:#991b1b;
+}
 .v4-order-form{
   border:1px solid var(--line);
   border-radius:18px;
