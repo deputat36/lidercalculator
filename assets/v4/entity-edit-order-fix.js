@@ -7,8 +7,8 @@ function esc(value) {
 function injectOrderEditButton() {
   const actions = document.querySelector('#orderCardSection .v4-order-detail-actions');
   if (!actions || !lastOrderId) return;
-  if (actions.querySelector('[data-entity-edit="order"]')) return;
-  actions.insertAdjacentHTML('afterbegin', `<button type="button" data-entity-edit="order" data-entity-id="${esc(lastOrderId)}">Редактировать заказ</button>`);
+  if (actions.querySelector('[data-edit-type="order"]')) return;
+  actions.insertAdjacentHTML('afterbegin', `<button type="button" data-edit-type="order" data-edit-id="${esc(lastOrderId)}">Редактировать заказ</button>`);
 }
 
 document.addEventListener('click', (event) => {
