@@ -139,6 +139,7 @@ window.addEventListener('leader-v4:force-tab', (event) => {
 });
 
 window.leaderV4OpenTab = openTab;
+window.v4SetTab = openTab;
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
