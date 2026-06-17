@@ -141,7 +141,7 @@ html,body{max-width:100%;overflow-x:hidden!important}.v4-shell{width:100%;max-wi
   function setTab(tab){
     document.body.dataset.v4Tab = tab;
     document.querySelectorAll('[data-v4-tab-button]').forEach(function(btn){
-      btn.classList.toggle('is-active', btn.datasetV4TabButton === tab);
+      btn.classList.toggle('is-active', btn.dataset.v4TabButton === tab);
     });
   }
   document.addEventListener('click', function(event){
