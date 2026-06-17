@@ -7,6 +7,7 @@ const CALC_FIELDS = 'id,lead_id,need_id,client_id,title,status,version_number,cl
 const ITEM_FIELDS = 'id,calculation_id,lead_id,catalog_id,category,item_type,name,unit,qty,contractor_price,contractor_sum,markup_percent,client_price,client_sum,profit,margin_percent,comment,data,sort_order,created_at,updated_at';
 
 let lastLeadId = null;
+let loadedLeadId = null;
 let loadingLeadId = null;
 let selectedId = null;
 let selectedItems = [];
@@ -45,7 +46,10 @@ async function loadCalculations(force = false) {
   const leadId = v4State.route.leadId || null;
   if (!leadId || !v4State.crmReady) return;
   if (!force && loadingLeadId === leadId) return;
-  if (!force && lastLeadId === leadId && Array.isArray(v4State.calculations) && !v4State.calculationsBusy) return;
+  if (!force && loadedLeadId === leadId && Array.isArray(v4State.calculations) && !v4State.calculationsBusy) {
+    scheduleRender();
+    return;
+  }
 
   loadingLeadId = leadId;
   setState({ calculationsBusy: true, calculationsError: '' });
@@ -61,9 +65,10 @@ async function loadCalculations(force = false) {
     );
     if (response.error) throw response.error;
     if (v4State.route.leadId !== leadId) return;
+    loadedLeadId = leadId;
     setState({ calculations: response.data || [], calculationsBusy: false, calculationsError: '' });
-    lastLeadId = leadId;
   } catch (error) {
+    loadedLeadId = null;
     setState({ calculations: [], calculationsBusy: false, calculationsError: friendlyError(error) });
   } finally {
     if (loadingLeadId === leadId) loadingLeadId = null;
@@ -198,6 +203,7 @@ function bind() {
     loadCalculations(false);
   });
   document.addEventListener('leader-v4:route-change', () => {
+    loadedLeadId = null;
     lastLeadId = null;
     selectedId = null;
     selectedItems = [];
