@@ -1,6 +1,7 @@
 const SECTION_BY_TAB = {
   leads: 'leadsSection',
   orders: 'ordersListSection',
+  production: 'productionBoardSection',
   clients: 'clientsSection',
   calculations: 'calculationsListSection',
   offers: 'offersListSection',
@@ -10,7 +11,7 @@ const SECTION_BY_TAB = {
   orderCard: 'orderCardSection'
 };
 
-const LIST_TABS = ['orders', 'clients', 'calculations', 'offers'];
+const LIST_TABS = ['orders', 'production', 'clients', 'calculations', 'offers'];
 const warmedTabs = new Set();
 let sheetPrintAutoTouched = false;
 
