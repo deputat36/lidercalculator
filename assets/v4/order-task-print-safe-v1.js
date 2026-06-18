@@ -43,6 +43,14 @@ function rowHeight(row) {
   return row.height || row.h || row.data?.height || '';
 }
 
+function markSafeButtons() {
+  document.querySelectorAll('[data-print-order-task]').forEach((button) => {
+    button.textContent = 'Печать задания без контактов';
+    button.title = 'Печатает производственный лист без имени, телефона и контактов клиента';
+    button.dataset.safePrintInterceptor = '1';
+  });
+}
+
 function printHtml(bundle) {
   const { order, items } = bundle;
   const data = asData(order.data);
@@ -74,6 +82,7 @@ function boot() {
     if (openOrder?.dataset.openOrder) {
       lastOrderId = openOrder.dataset.openOrder;
       window.LeaderV4CurrentOrderId = lastOrderId;
+      setTimeout(markSafeButtons, 500);
     }
     const print = event.target.closest?.('[data-print-order-task]');
     if (!print) return;
@@ -82,6 +91,9 @@ function boot() {
     event.stopImmediatePropagation();
     safePrintOrderTask();
   }, true);
+  document.addEventListener('leader-v4-order-updated', () => setTimeout(markSafeButtons, 300));
+  new MutationObserver(markSafeButtons).observe(document.body, { childList: true, subtree: true });
+  setTimeout(markSafeButtons, 800);
 }
 
 if (!window.LeaderV4OrderTaskPrintSafeV1Booted) {
