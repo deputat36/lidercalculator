@@ -9,12 +9,19 @@ let busy = false;
 
 const esc = (value) => String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 const isSiteLead = (lead) => String([lead?.source, lead?.page_url, lead?.message].join(' ')).toLowerCase().includes('сайт') || String(lead?.page_url || '').includes('lider-bsk.ru');
+const NEED_FIELDS = 'id,lead_id,client_id,need_type,title,description,structured_data,need_design,need_installation,design_reason,installation_reason,deadline_text,deadline_date,files,status,completeness_score,missing_fields,created_by,updated_by,created_at,updated_at';
 
 function getPayload(lead) {
   const payload = lead?.payload;
   if (!payload) return {};
   if (typeof payload === 'object') return payload;
   try { return JSON.parse(payload); } catch (_) { return {}; }
+}
+
+function asData(value) {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(value); } catch (_) { return {}; }
 }
 
 function guessNeedType(service = '') {
@@ -39,11 +46,29 @@ function makeDescription(lead, payload) {
   ].filter(Boolean).join('\n');
 }
 
+function isSiteNeed(need) {
+  const data = asData(need?.structured_data);
+  return data.source === 'site_public_form' || String(need?.title || '').includes('с сайта');
+}
+
 function hasSiteNeed() {
-  return (v4State.leadNeeds || []).some((need) => {
-    const data = need.structured_data || {};
-    return data.source === 'site_public_form' || String(need.title || '').includes('с сайта');
-  });
+  return (v4State.leadNeeds || []).some(isSiteNeed);
+}
+
+async function findExistingSiteNeed(leadId) {
+  const response = await timeout(
+    supabaseClient
+      .from('leader_lead_needs')
+      .select(NEED_FIELDS)
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: false }),
+    12000,
+    'Проверка существующих потребностей не завершилась за 12 секунд'
+  );
+  if (response.error) throw response.error;
+  const needs = response.data || [];
+  if (needs.length) setState({ leadNeeds: needs });
+  return needs.find(isSiteNeed) || null;
 }
 
 function ensureButton() {
@@ -54,6 +79,14 @@ function ensureButton() {
   const actions = box.querySelector('.v4-lead-site-summary-actions') || box;
   const disabled = hasSiteNeed() ? ' disabled title="Потребность из сайта уже создана"' : '';
   actions.insertAdjacentHTML('beforeend', `<button type="button" data-create-site-need${disabled}>Создать потребность из данных сайта</button>`);
+}
+
+function markButtonCreated() {
+  const button = document.querySelector('[data-create-site-need]');
+  if (!button) return;
+  button.disabled = true;
+  button.title = 'Потребность из сайта уже создана';
+  button.textContent = 'Потребность из сайта уже создана';
 }
 
 function calculateCompleteness(payload) {
@@ -120,21 +153,31 @@ async function createSiteNeed() {
     return;
   }
   if (hasSiteNeed()) {
+    markButtonCreated();
     toast('Потребность из данных сайта уже создана');
     return;
   }
   busy = true;
   try {
+    setStatus('Проверяю потребности по заявке...', 'warn');
+    const existing = await findExistingSiteNeed(lead.id);
+    if (existing) {
+      markButtonCreated();
+      toast('Потребность из данных сайта уже была создана ранее');
+      setStatus('Потребность из сайта уже есть', 'good');
+      return;
+    }
     setStatus('Создаю потребность из данных сайта...', 'warn');
     const payload = buildNeedPayload();
     const response = await timeout(
-      supabaseClient.from('leader_lead_needs').insert(payload).select('id,lead_id,client_id,need_type,title,description,structured_data,need_design,need_installation,design_reason,installation_reason,deadline_text,deadline_date,files,status,completeness_score,missing_fields,created_by,updated_by,created_at,updated_at').single(),
+      supabaseClient.from('leader_lead_needs').insert(payload).select(NEED_FIELDS).single(),
       12000,
       'Потребность из данных сайта не сохранилась за 12 секунд'
     );
     if (response.error) throw response.error;
     setState({ leadNeeds: [response.data, ...(v4State.leadNeeds || [])] });
     await loadNeeds(lead.id);
+    markButtonCreated();
     toast('Потребность создана из данных сайта');
     setStatus('Потребность из сайта создана', 'good');
     setTimeout(ensureButton, 300);
