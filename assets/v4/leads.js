@@ -9,6 +9,13 @@ const CLOSED_STATUSES = ['Спам', 'Создан заказ', 'Отказ', '�
 const ACTIVE_HIDDEN_STATUSES = new Set(CLOSED_STATUSES);
 const ARCHIVE_STATUSES = new Set(CLOSED_STATUSES);
 const STATUSES = ['Все', 'Новая', 'В работе', 'Уточнение деталей', 'Расчёт подготовлен', 'КП отправлено', 'Ждём ответ', 'Нужно пересчитать', 'Согласовано', 'Создан заказ', 'Отказ', 'Не отвечает', 'Дорого', 'Передумал', 'Спам'];
+const QUICK_FILTERS = [
+  ['active', 'Активные в работе'],
+  ['no_phone', 'Без телефона'],
+  ['no_next_contact', 'Без следующего контакта'],
+  ['site', 'Заявки с сайта'],
+  ['archive', 'Архив / завершённые']
+];
 
 let leadsLoadPromise = null;
 
@@ -35,6 +42,16 @@ function phoneHref(phone) {
   return cleaned ? `tel:${cleaned}` : '';
 }
 
+function isSiteLead(lead) {
+  const source = String(lead?.source || '').toLowerCase();
+  const pageUrl = String(lead?.page_url || '').toLowerCase();
+  return source.includes('сайт') || source.includes('site') || pageUrl.includes('lider-bsk');
+}
+
+function isActiveLead(lead) {
+  return !ACTIVE_HIDDEN_STATUSES.has(lead.status || 'Новая');
+}
+
 function leadHaystack(lead) {
   return [lead.name, lead.phone, lead.source, lead.service, lead.message, lead.city, lead.status].join(' ').toLowerCase();
 }
@@ -50,9 +67,12 @@ function filteredLeads() {
   const query = String(search || '').toLowerCase().trim();
   return v4State.leads.filter((lead) => {
     const leadStatus = lead.status || 'Новая';
-    if (status === 'active' && ACTIVE_HIDDEN_STATUSES.has(leadStatus)) return false;
+    if (status === 'active' && !isActiveLead(lead)) return false;
     if (status === 'archive' && !ARCHIVE_STATUSES.has(leadStatus)) return false;
-    if (status !== 'active' && status !== 'archive' && status !== 'Все' && leadStatus !== status) return false;
+    if (status === 'no_phone' && (String(lead.phone || '').trim() || !isActiveLead(lead))) return false;
+    if (status === 'no_next_contact' && (lead.next_contact_at || !isActiveLead(lead))) return false;
+    if (status === 'site' && !isSiteLead(lead)) return false;
+    if (!['active', 'archive', 'no_phone', 'no_next_contact', 'site', 'Все'].includes(status) && leadStatus !== status) return false;
     if (source !== 'Все' && (lead.source || 'Не указан') !== source) return false;
     if (query && !leadHaystack(lead).includes(query)) return false;
     return true;
@@ -61,11 +81,14 @@ function filteredLeads() {
 
 function renderStats() {
   const leads = v4State.leads;
+  const active = leads.filter(isActiveLead);
   const setText = (id, value) => { const element = byId(id); if (element) element.textContent = value; };
   setText('v4StatAllLeads', leads.length);
   setText('v4StatNewLeads', leads.filter((lead) => (lead.status || 'Новая') === 'Новая').length);
   setText('v4StatWorkLeads', leads.filter((lead) => (lead.status || '') === 'В работе').length);
   setText('v4StatWaitingLeads', leads.filter((lead) => ['Ждём ответ', 'КП отправлено', 'Уточнение деталей'].includes(lead.status || '')).length);
+  setText('v4StatNoPhoneLeads', active.filter((lead) => !String(lead.phone || '').trim()).length);
+  setText('v4StatNoNextContactLeads', active.filter((lead) => !lead.next_contact_at).length);
 }
 
 function renderSourceOptions() {
@@ -85,8 +108,7 @@ function renderStatusOptions() {
   if (!select) return;
   const current = select.value || v4State.leadFilters.status || 'active';
   const options = [
-    ['active', 'Активные в работе'],
-    ['archive', 'Архив / завершённые'],
+    ...QUICK_FILTERS,
     ...STATUSES.map((status) => [status, status])
   ];
   select.innerHTML = options.map(([value, label]) => `<option value="${esc(value)}" ${value === current ? 'selected' : ''}>${esc(label)}</option>`).join('');
@@ -102,6 +124,14 @@ function statusClass(status) {
 
 function renderLeadCard(lead) {
   const phone = phoneHref(lead.phone);
+  const noPhone = !String(lead.phone || '').trim();
+  const noNextContact = !lead.next_contact_at && isActiveLead(lead);
+  const siteLead = isSiteLead(lead);
+  const hints = [
+    siteLead ? '<span class="v4-lead-inline-hint is-site">Сайт</span>' : '',
+    noPhone ? '<span class="v4-lead-inline-hint is-danger">Нет телефона</span>' : '',
+    noNextContact ? '<span class="v4-lead-inline-hint is-warn">Нет следующего контакта</span>' : ''
+  ].filter(Boolean).join('');
   return `
     <article class="v4-lead-card" data-id="${esc(lead.id)}">
       <div class="v4-lead-main">
@@ -109,6 +139,7 @@ function renderLeadCard(lead) {
           <h3>${esc(lead.name || 'Без имени')}</h3>
           <span class="v4-lead-status ${statusClass(lead.status || 'Новая')}">${esc(lead.status || 'Новая')}</span>
         </div>
+        ${hints ? `<div class="v4-lead-inline-hints">${hints}</div>` : ''}
         <div class="v4-lead-meta">
           <span>${formatDate(lead.created_at)}</span>
           <span>${esc(lead.source || 'Источник не указан')}</span>
@@ -119,6 +150,7 @@ function renderLeadCard(lead) {
           <span><b>Город:</b> ${esc(lead.city || '—')}</span>
           <span><b>Бюджет:</b> ${money(lead.budget || lead.estimated_amount)}</span>
         </div>
+        ${noPhone ? '<div class="v4-lead-warning-note">Нужно дозаполнить контакт: проверьте сообщение, страницу заявки или другой способ связи.</div>' : ''}
         ${lead.message ? `<p class="v4-lead-message">${esc(lead.message)}</p>` : ''}
       </div>
       <div class="v4-lead-actions">
@@ -130,7 +162,23 @@ function renderLeadCard(lead) {
   `;
 }
 
+function ensureLeadStatsExtras() {
+  const stats = document.querySelector('.v4-lead-stats');
+  if (!stats || document.getElementById('v4StatNoPhoneLeads')) return;
+  stats.insertAdjacentHTML('beforeend', '<div><span>Без телефона</span><b id="v4StatNoPhoneLeads">0</b></div><div><span>Без контакта</span><b id="v4StatNoNextContactLeads">0</b></div>');
+}
+
+function ensureInlineStyles() {
+  if (document.getElementById('leadsV4InlineHintsStyles')) return;
+  const style = document.createElement('style');
+  style.id = 'leadsV4InlineHintsStyles';
+  style.textContent = `.v4-lead-inline-hints{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 0}.v4-lead-inline-hint{display:inline-flex;border-radius:999px;padding:5px 8px;font-size:12px;font-weight:900;border:1px solid #cbd5e1;background:#f8fafc;color:#334155}.v4-lead-inline-hint.is-site{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}.v4-lead-inline-hint.is-danger{background:#fee2e2;border-color:#fecaca;color:#991b1b}.v4-lead-inline-hint.is-warn{background:#fef3c7;border-color:#fcd34d;color:#92400e}.v4-lead-warning-note{margin-top:8px;border:1px solid #fecaca;background:#fff1f2;color:#991b1b;border-radius:12px;padding:8px;font-weight:800}`;
+  document.head.appendChild(style);
+}
+
 export function renderLeads() {
+  ensureLeadStatsExtras();
+  ensureInlineStyles();
   renderStats();
   renderStatusOptions();
   renderSourceOptions();
