@@ -10,6 +10,8 @@ const ACTIVE_HIDDEN_STATUSES = new Set(CLOSED_STATUSES);
 const ARCHIVE_STATUSES = new Set(CLOSED_STATUSES);
 const STATUSES = ['Все', 'Новая', 'В работе', 'Уточнение деталей', 'Расчёт подготовлен', 'КП отправлено', 'Ждём ответ', 'Нужно пересчитать', 'Согласовано', 'Создан заказ', 'Отказ', 'Не отвечает', 'Дорого', 'Передумал', 'Спам'];
 
+let leadsLoadPromise = null;
+
 function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 }
@@ -142,7 +144,7 @@ export function renderLeads() {
     return;
   }
   if (v4State.leadsError) {
-    list.innerHTML = `<div class="v4-empty is-error">${esc(v4State.leadsError)}</div>`;
+    list.innerHTML = `<div class="v4-empty is-error">${esc(v4State.leadsError)}<div class="v4-form-actions" style="margin-top:12px"><button type="button" class="v4-primary" data-retry-leads>Повторить загрузку заявок</button></div></div>`;
     return;
   }
   if (!v4State.leadsLoaded) {
@@ -160,11 +162,7 @@ export function renderLeads() {
   list.innerHTML = leads.map(renderLeadCard).join('');
 }
 
-export async function loadLeads({ silent = false } = {}) {
-  if (!v4State.crmReady) {
-    renderLeads();
-    return [];
-  }
+async function doLoadLeads({ silent = false } = {}) {
   setState({ leadsBusy: true, leadsError: null });
   renderLeads();
   try {
@@ -175,8 +173,8 @@ export async function loadLeads({ silent = false } = {}) {
         .select(LEAD_FIELDS)
         .order('created_at', { ascending: false })
         .limit(50),
-      14000,
-      'Заявки не загрузились за 14 секунд'
+      30000,
+      'Заявки не загрузились за 30 секунд'
     );
     if (response.error) throw response.error;
     setState({ leads: response.data || [], leadsLoaded: true, leadsBusy: false, leadsError: null });
@@ -185,11 +183,24 @@ export async function loadLeads({ silent = false } = {}) {
     return response.data || [];
   } catch (error) {
     const message = friendlyError(error);
-    setState({ leadsBusy: false, leadsError: message, leadsLoaded: true });
+    setState({ leadsBusy: false, leadsError: message, leadsLoaded: false });
     renderLeads();
     setStatus(`Ошибка загрузки заявок: ${message}`, 'error');
     return [];
+  } finally {
+    leadsLoadPromise = null;
   }
+}
+
+export async function loadLeads({ silent = false, force = false } = {}) {
+  if (!v4State.crmReady) {
+    renderLeads();
+    return [];
+  }
+  if (leadsLoadPromise && !force) return leadsLoadPromise;
+  if (v4State.leadsBusy && leadsLoadPromise && !force) return leadsLoadPromise;
+  leadsLoadPromise = doLoadLeads({ silent });
+  return leadsLoadPromise;
 }
 
 async function updateLeadStatus(id, status) {
@@ -200,7 +211,7 @@ async function updateLeadStatus(id, status) {
       .eq('id', id)
       .select(LEAD_FIELDS)
       .single(),
-    12000,
+    20000,
     'Статус заявки не обновился вовремя'
   );
   if (response.error) throw response.error;
@@ -210,7 +221,7 @@ async function updateLeadStatus(id, status) {
 }
 
 function bindLeadEvents() {
-  byId('reloadLeadsBtn')?.addEventListener('click', () => loadLeads().then(() => toast('Заявки обновлены')));
+  byId('reloadLeadsBtn')?.addEventListener('click', () => loadLeads({ force: true }).then(() => toast('Заявки обновлены')));
   byId('leadStatusFilter')?.addEventListener('change', (event) => {
     setLeadFilters({ status: event.target.value });
     renderLeads();
@@ -224,6 +235,10 @@ function bindLeadEvents() {
     renderLeads();
   });
   byId('leadsList')?.addEventListener('click', async (event) => {
+    if (event.target.closest('[data-retry-leads]')) {
+      await loadLeads({ silent: false, force: true });
+      return;
+    }
     const button = event.target.closest('button[data-action]');
     if (!button) return;
     const card = button.closest('.v4-lead-card');
