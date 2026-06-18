@@ -10,10 +10,10 @@ async function ensureProfileForUser(user) {
   try {
     const response = await timeout(
       supabaseClient.rpc('leader_ensure_profile', { user_email: user.email || '' }, {
-        timeoutMs: V4_CONFIG.timeouts.profileMs + 4000,
+        timeoutMs: Math.max(V4_CONFIG.timeouts.profileMs + 7000, 12000),
         timeoutMessage: 'Профиль доступа не подготовился вовремя'
       }),
-      V4_CONFIG.timeouts.profileMs + 4500,
+      Math.max(V4_CONFIG.timeouts.profileMs + 7500, 12500),
       'Профиль доступа не подготовился вовремя'
     );
     if (response.error) throw response.error;
@@ -26,14 +26,17 @@ async function ensureProfileForUser(user) {
     return profile;
   } catch (error) {
     console.warn('CRM v4 profile bootstrap warning:', error);
-    setProfileNotice('Профиль доступа временно не удалось подготовить. CRM откроется, но часть данных может не загрузиться.');
+    if (!v4State.profileLoaded) {
+      setProfileNotice('Профиль доступа временно не удалось подготовить. CRM откроется, но часть данных может не загрузиться.');
+    }
     return null;
   }
 }
 
 async function loadProfileInBackground(user) {
   if (!user?.id) return;
-  if (!v4State.profileLoaded) setProfileNotice('Профиль загружается в фоне...');
+  const hadProfile = Boolean(v4State.profileLoaded && v4State.profile);
+  if (!hadProfile) setProfileNotice('Профиль загружается в фоне...');
   try {
     const response = await timeout(
       supabaseClient
@@ -41,18 +44,30 @@ async function loadProfileInBackground(user) {
         .select('user_id,email,role,is_active,full_name')
         .eq('user_id', user.id)
         .maybeSingle(),
-      V4_CONFIG.timeouts.profileMs,
+      Math.max(V4_CONFIG.timeouts.profileMs + 7000, 12000),
       'Профиль загружается дольше обычного'
     );
     if (response.error) throw response.error;
-    setState({ profile: response.data, profileLoaded: true });
-    renderProfile(response.data);
-    setProfileNotice(response.data ? '' : 'Профиль не найден, CRM открыта по активной сессии.');
+    if (response.data) {
+      setState({ profile: response.data, profileLoaded: true });
+      renderProfile(response.data);
+      setProfileNotice('');
+      return;
+    }
+    if (!hadProfile) {
+      setState({ profile: null, profileLoaded: false });
+      renderProfile(null);
+      setProfileNotice('Профиль не найден, CRM открыта по активной сессии.');
+    }
   } catch (error) {
     console.warn('CRM v4 profile warning:', error);
-    setState({ profile: null, profileLoaded: false });
-    renderProfile(null);
-    setProfileNotice('Профиль временно не загрузился. Вход выполнен, CRM доступна.');
+    if (!hadProfile) {
+      setState({ profile: null, profileLoaded: false });
+      renderProfile(null);
+      setProfileNotice('Профиль временно не загрузился. Вход выполнен, CRM доступна.');
+    } else {
+      setProfileNotice('');
+    }
   }
 }
 
