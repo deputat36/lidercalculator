@@ -15,6 +15,7 @@ let historyCatalogId = null;
 let historyBusy = false;
 let historyError = '';
 let busy = false;
+let loaded = false;
 let errorText = '';
 let filter = { search: '', category: 'Все', status: 'active', group: 'Все' };
 
@@ -239,6 +240,10 @@ function render() {
     section.innerHTML = '<div class="v4-empty">Номенклатура загрузится после входа.</div>';
     return;
   }
+  if (!loaded && !busy && !errorText) {
+    section.innerHTML = '<div class="v4-empty">Номенклатура загрузится при открытии вкладки. Это ускоряет вход в CRM.</div>';
+    return;
+  }
   const visible = filteredRows();
   const activeCount = rows.filter((row) => row.is_active).length;
   section.innerHTML = `
@@ -273,8 +278,12 @@ function render() {
   `;
 }
 
-export async function loadCatalogManager() {
+export async function loadCatalogManager(force = false) {
   if (!v4State.crmReady || busy) {
+    render();
+    return rows;
+  }
+  if (loaded && !force) {
     render();
     return rows;
   }
@@ -283,12 +292,13 @@ export async function loadCatalogManager() {
   render();
   try {
     const response = await timeout(
-      supabaseClient.from('leader_catalog').select(CATALOG_FIELDS).order('sort_order', { ascending: true }).order('name', { ascending: true }),
-      12000,
-      'Номенклатура не загрузилась за 12 секунд'
+      supabaseClient.from('leader_catalog').select(CATALOG_FIELDS).order('sort_order', { ascending: true }).order('name', { ascending: true }).limit(500),
+      25000,
+      'Номенклатура не загрузилась за 25 секунд'
     );
     if (response.error) throw response.error;
     rows = (response.data || []).map(normalize);
+    loaded = true;
     setStatus(`Номенклатура загружена: ${rows.length} позиций`, 'good');
   } catch (error) {
     errorText = friendlyError(error);
@@ -380,6 +390,7 @@ async function createRow() {
     const created = normalize(response.data);
     rows = [created, ...rows];
     await logChange({ ...created, contractor_price: null, markup_percent: null, is_active: null }, created, 'Создание позиции из CRM v4');
+    loaded = true;
     render();
     setStatus('Позиция добавлена', 'good');
     toast('Позиция добавлена');
@@ -390,14 +401,20 @@ async function createRow() {
 }
 
 function bindEvents() {
-  document.addEventListener('leader-v4:crm-ready', loadCatalogManager);
+  document.addEventListener('leader-v4:crm-ready', () => {
+    ensureSection();
+    render();
+  });
+  document.addEventListener('leader-v4:tab-opened', (event) => {
+    if (event.detail?.tab === 'catalog') loadCatalogManager(false);
+  });
   document.addEventListener('DOMContentLoaded', () => {
     ensureSection();
     render();
-    if (v4State.crmReady) loadCatalogManager();
+    if (v4State.crmReady && document.body.dataset.v4Tab === 'catalog') loadCatalogManager(false);
   });
   document.addEventListener('click', async (event) => {
-    if (event.target.closest('#reloadCatalogBtn')) await loadCatalogManager();
+    if (event.target.closest('#reloadCatalogBtn')) await loadCatalogManager(true);
     if (event.target.closest('#createCatalogItemBtn')) await createRow();
     if (event.target.closest('[data-catalog-history-close]')) {
       historyCatalogId = null;
