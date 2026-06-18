@@ -82,11 +82,13 @@ async function setTomorrowContact() {
 
 function boot() {
   document.addEventListener('click', (event) => {
-    const button = event.target.closest?.('[data-next-contact="tomorrow"]');
+    const button = event.target.closest?.('#leadSiteSummaryBox [data-next-contact="tomorrow"]');
     if (!button) return;
     event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
     setTomorrowContact();
-  });
+  }, true);
 }
 
 if (!window.LeaderV4LeadSiteNextContactV1Booted) {
