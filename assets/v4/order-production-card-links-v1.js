@@ -43,9 +43,13 @@ function boot() {
   booted = true;
   ensureStyles();
   document.addEventListener('leader-v4-order-updated', () => setTimeout(enhance, 600));
+  document.addEventListener('leader-v4:tab-opened', (event) => {
+    if (event.detail?.tab === 'orderCard' || event.detail?.tab === 'production') setTimeout(enhance, 700);
+  });
   document.addEventListener('click', (event) => {
-    if (event.target.closest?.('[data-open-order],[data-production-refresh],[data-create-production-job],[data-create-installation-from-order],[data-production-job-status],[data-install-job-status]')) {
+    if (event.target.closest?.('[data-open-order],[data-production-refresh],[data-create-production-job],[data-create-production-job-safe],[data-create-installation-from-order],[data-upsert-installation-from-order],[data-create-extra-installation-from-order],[data-production-job-status],[data-install-job-status],[data-save-production-job],[data-save-installation-job]')) {
       setTimeout(enhance, 900);
+      setTimeout(enhance, 1600);
     }
   });
   new MutationObserver(enhance).observe(document.body, { childList: true, subtree: true });
