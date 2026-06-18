@@ -2,6 +2,8 @@ import { v4State, setLeadFilters } from './state.js';
 import { renderLeads, loadLeads } from './leads.js';
 
 let booted = false;
+let lastPanelSignature = '';
+let labelsTimer = null;
 
 const esc = (value) => String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 const isSiteLead = (lead) => String([lead.source, lead.page_url, lead.message].join(' ')).toLowerCase().includes('сайт') || String(lead.page_url || '').includes('lider-bsk.ru');
@@ -31,6 +33,10 @@ function siteStats() {
   };
 }
 
+function panelSignature(stats) {
+  return [stats.all, stats.site, stats.siteNew, stats.siteNoNext, stats.siteNoPhone].join('|');
+}
+
 function applySiteCardLabels() {
   document.querySelectorAll('.v4-lead-card[data-id]').forEach((card) => {
     const lead = (v4State.leads || []).find((item) => String(item.id) === String(card.dataset.id));
@@ -46,7 +52,12 @@ function applySiteCardLabels() {
   });
 }
 
-function renderPanel() {
+function scheduleLabels() {
+  clearTimeout(labelsTimer);
+  labelsTimer = setTimeout(applySiteCardLabels, 120);
+}
+
+function renderPanel(force = false) {
   ensureStyles();
   const section = document.getElementById('leadsSection');
   const filters = section?.querySelector('.v4-filters');
@@ -59,8 +70,15 @@ function renderPanel() {
     filters.insertAdjacentElement('afterend', panel);
   }
   const s = siteStats();
+  const signature = panelSignature(s);
+  if (!force && panel.dataset.signature === signature && lastPanelSignature === signature) {
+    scheduleLabels();
+    return;
+  }
+  lastPanelSignature = signature;
+  panel.dataset.signature = signature;
   panel.innerHTML = `<h3>Сайт ↔ CRM</h3><p>Быстрый контроль заявок с сайта: что пришло, что новое, где нет телефона и где не назначен следующий контакт.</p><div class="v4-site-crm-grid"><div class="v4-site-crm-stat"><span>Всего заявок</span><b>${s.all}</b></div><div class="v4-site-crm-stat"><span>С сайта</span><b>${s.site}</b></div><div class="v4-site-crm-stat"><span>Новые с сайта</span><b>${s.siteNew}</b></div><div class="v4-site-crm-stat"><span>Без контакта</span><b>${s.siteNoNext}</b></div><div class="v4-site-crm-stat ${s.siteNoPhone ? 'is-danger' : ''}"><span>Без телефона</span><b>${s.siteNoPhone}</b></div></div><div class="v4-site-crm-actions"><button type="button" class="v4-primary" data-site-crm-filter="site">Показать заявки с сайта</button><button type="button" data-site-crm-filter="new">Новые с сайта</button><button type="button" data-site-crm-filter="no-next">Без следующего контакта</button><button type="button" class="is-danger" data-site-crm-filter="no-phone">Без телефона</button><button type="button" data-site-crm-filter="reset">Сбросить фильтр</button><button type="button" data-site-crm-refresh>Обновить заявки</button></div>`;
-  applySiteCardLabels();
+  scheduleLabels();
 }
 
 function applyFilter(type) {
@@ -92,7 +110,7 @@ function applyFilter(type) {
         if (type === 'no-phone' && lead && hasPhone(lead)) card.style.display = 'none';
       });
     }
-  }, 60);
+  }, 80);
 }
 
 function boot() {
@@ -108,16 +126,13 @@ function boot() {
     }
     if (event.target.closest?.('[data-site-crm-refresh]')) {
       event.preventDefault();
-      loadLeads({ silent: false }).then(() => setTimeout(renderPanel, 250));
+      loadLeads({ silent: false }).then(() => setTimeout(() => renderPanel(true), 250));
     }
   });
-  document.addEventListener('leader-v4:crm-ready', () => setTimeout(renderPanel, 800));
+  document.addEventListener('leader-v4:crm-ready', () => setTimeout(() => renderPanel(true), 800));
   document.addEventListener('leader-v4:lead-card-rendered', () => setTimeout(applySiteCardLabels, 200));
-  new MutationObserver(() => {
-    renderPanel();
-    applySiteCardLabels();
-  }).observe(document.body, { childList: true, subtree: true });
-  setTimeout(renderPanel, 1200);
+  new MutationObserver(() => scheduleLabels()).observe(document.body, { childList: true, subtree: true });
+  setTimeout(() => renderPanel(true), 1200);
 }
 
 boot();
