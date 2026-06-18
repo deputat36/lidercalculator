@@ -12,13 +12,15 @@ function cleanProfileNotice() {
   }
 }
 
-document.addEventListener('leader-v4:crm-ready', () => {
+function scheduleClean() {
   setTimeout(cleanProfileNotice, 300);
   setTimeout(cleanProfileNotice, 1200);
   setTimeout(cleanProfileNotice, 3000);
+}
+
+document.addEventListener('leader-v4:crm-ready', scheduleClean);
+document.addEventListener('DOMContentLoaded', scheduleClean);
+
+document.addEventListener('input', (event) => {
+  if (event.target?.id === 'loginEmail' || event.target?.id === 'loginPassword') cleanProfileNotice();
 });
-document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(cleanProfileNotice, 1200);
-  setTimeout(cleanProfileNotice, 3000);
-});
-new MutationObserver(() => cleanProfileNotice()).observe(document.body, { childList: true, subtree: true, characterData: true });
