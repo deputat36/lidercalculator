@@ -1,4 +1,5 @@
 import './production-diagnostics-v1.js?v=20260617-1';
+import './site-crm-workflow-v1.js?v=20260617-1';
 
 let booted = false;
 
