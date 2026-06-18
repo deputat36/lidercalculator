@@ -1,7 +1,9 @@
 import './production-diagnostics-v1.js?v=20260617-1';
-import './site-crm-workflow-v1.js?v=20260617-1';
+import './site-crm-workflow-v1.js?v=20260618-2';
 import './lead-site-summary-v1.js?v=20260618-1';
 import './lead-no-phone-workflow-v1.js?v=20260618-1';
+import './lead-site-need-create-v1.js?v=20260618-2';
+import './lead-site-next-contact-v1.js?v=20260618-2';
 
 let booted = false;
 
