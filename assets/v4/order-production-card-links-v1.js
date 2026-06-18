@@ -1,3 +1,5 @@
+import './production-diagnostics-v1.js?v=20260617-1';
+
 let booted = false;
 
 function esc(value) {
