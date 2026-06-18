@@ -1,5 +1,5 @@
 import './lead-card-accordion.js?v=20260617-1';
-import './profile-notice-cleanup-v1.js?v=20260618-1';
+import './profile-notice-cleanup-v1.js?v=20260618-2';
 
 let currentLeadId = null;
 
