@@ -11,7 +11,6 @@ const SECTION_BY_TAB = {
   orderCard: 'orderCardSection'
 };
 
-const LIST_TABS = ['orders', 'production', 'clients', 'calculations', 'offers'];
 const warmedTabs = new Set();
 let sheetPrintAutoTouched = false;
 let productionBoardLoading = null;
@@ -69,27 +68,24 @@ function dispatchTabOpened(tab) {
   document.dispatchEvent(new CustomEvent('leader-v4:tab-opened', { detail: { tab } }));
 }
 
-function shouldWarmTab(tab) {
-  if (!LIST_TABS.includes(tab)) return false;
-  if (warmedTabs.has(tab)) return false;
-  const content = document.getElementById(`${SECTION_BY_TAB[tab]}Content`);
+function shouldWarmProduction() {
+  if (warmedTabs.has('production')) return false;
+  const content = document.getElementById('productionBoardSectionContent');
   if (!content) return true;
   const text = content.textContent || '';
-  return text.includes('Раздел загружается') || text.includes('Раздел производства загружается') || text.includes('Загружаю') || text.trim() === '';
+  return text.includes('Раздел производства загружается') || text.includes('Загружаю') || text.trim() === '';
 }
 
-function warmTabOnce(tab) {
-  if (!shouldWarmTab(tab)) return;
-  warmedTabs.add(tab);
-  const button = document.querySelector(`[data-v4-list-refresh="${tab}"]`);
-  if (button) button.click();
+function warmProductionOnce() {
+  if (!shouldWarmProduction()) return;
+  warmedTabs.add('production');
+  loadProductionBoardV3();
 }
 
-function openTab(tab) {
-  if (!tab) return;
-  showOnly(tab);
-  warmTabOnce(tab);
-  dispatchTabOpened(tab);
+function openProductionTab() {
+  showOnly('production');
+  warmProductionOnce();
+  dispatchTabOpened('production');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -131,15 +127,15 @@ function scheduleSheetEnhance() {
   setTimeout(enhanceSheetPrintOption, 250);
 }
 
+// Важно: обычные вкладки теперь ведёт responsive-ui.js.
+// Этот модуль перехватывает только «Производство», чтобы не было двойного управления вкладками и падений загрузки разделов.
 document.addEventListener('click', (event) => {
-  const button = event.target.closest?.('[data-v4-tab-button]');
+  const button = event.target.closest?.('[data-v4-tab-button="production"]');
   if (!button) return;
-  const tab = button.dataset.v4TabButton || 'leads';
-  if (!SECTION_BY_TAB[tab] && tab !== 'help') return;
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
-  openTab(tab);
+  openProductionTab();
 }, true);
 
 document.addEventListener('click', (event) => {
@@ -160,21 +156,19 @@ document.addEventListener('leader-v4:route-change', () => {
 });
 
 window.addEventListener('leader-v4:force-tab', (event) => {
-  openTab(event.detail?.tab || 'leads');
+  if (event.detail?.tab === 'production') openProductionTab();
 });
 
-window.leaderV4OpenTab = openTab;
-window.v4SetTab = openTab;
 window.LeaderV4LoadProductionBoard = loadProductionBoardV3;
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    showOnly(document.body.dataset.v4Tab || 'leads');
-    dispatchTabOpened(document.body.dataset.v4Tab || 'leads');
+    ensureManagedSections();
+    if (document.body.dataset.v4Tab === 'production') dispatchTabOpened('production');
     scheduleSheetEnhance();
   });
 } else {
-  showOnly(document.body.dataset.v4Tab || 'leads');
-  dispatchTabOpened(document.body.dataset.v4Tab || 'leads');
+  ensureManagedSections();
+  if (document.body.dataset.v4Tab === 'production') dispatchTabOpened('production');
   scheduleSheetEnhance();
 }
