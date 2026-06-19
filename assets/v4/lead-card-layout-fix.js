@@ -6,6 +6,7 @@ import './lead-safe-badges-v1.js?v=20260618-1';
 import './lead-site-need-create-safe-v1.js?v=20260618-1';
 import './lead-action-autolog-v1.js?v=20260618-1';
 import './orders-fast-loader-v1.js?v=20260619-1';
+import './offers-fast-loader-v1.js?v=20260619-1';
 import './control-sections-lazy-loader-v1.js?v=20260619-1';
 
 let currentLeadId = null;
