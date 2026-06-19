@@ -3,28 +3,23 @@ import { friendlyError } from './api.js';
 import { v4State } from './state.js';
 import { setStatus, toast } from './ui.js';
 
+const ORDER_FIELDS = 'id,order_number,project_name,status,deadline,contractor_cost,client_total,layout_status,layout_link,data,production_priority,priority,production_comment,internal_comment,progress_percent,production_status,installation_status,installation_address,ready_at,issued_at';
+const ORDER_ITEM_FIELDS = 'id,name,unit,quantity,contractor_price,client_sum,comment,data,created_at';
+const PRODUCTION_JOB_FIELDS = 'id,order_id,title,production_status,layout_status,priority,deadline,contractor_cost,client_total,file_url,technical_task,internal_comment,sent_to_contractor_at,ready_at,created_at,updated_at';
+const INSTALLATION_JOB_FIELDS = 'id,order_id,title,install_status,installer_name,installer_phone,address,scheduled_at,before_photo_url,after_photo_url,created_at,updated_at';
+const PRODUCTION_EVENT_FIELDS = 'id,event_type,old_status,new_status,body,created_by_email,created_at';
+const ORDER_HISTORY_FIELDS = 'id,old_status,new_status,comment,changed_by_email,created_at';
+
 let currentOrderId = '';
 let busy = false;
 let booted = false;
 let lastRenderedOrderId = '';
 
-function esc(value) {
-  return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
-}
-function money(value) {
-  return `${Math.round(Number(value || 0)).toLocaleString('ru-RU')} ₽`;
-}
-function dateRu(value) {
-  if (!value) return '—';
-  try { return new Date(value).toLocaleDateString('ru-RU'); } catch (_) { return String(value); }
-}
-function dateTimeRu(value) {
-  if (!value) return '—';
-  try { return new Date(value).toLocaleString('ru-RU'); } catch (_) { return String(value); }
-}
-function nowIso() {
-  return new Date().toISOString();
-}
+function esc(value) { return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m])); }
+function money(value) { return `${Math.round(Number(value || 0)).toLocaleString('ru-RU')} ₽`; }
+function dateRu(value) { if (!value) return '—'; try { return new Date(value).toLocaleDateString('ru-RU'); } catch (_) { return String(value); } }
+function dateTimeRu(value) { if (!value) return '—'; try { return new Date(value).toLocaleString('ru-RU'); } catch (_) { return String(value); } }
+function nowIso() { return new Date().toISOString(); }
 function statusClass(status = '') {
   const text = String(status).toLowerCase();
   if (text.includes('готов') || text.includes('выдан') || text.includes('выполн') || text.includes('соглас')) return 'is-good';
@@ -39,7 +34,9 @@ function orderRows(order, orderItems = []) {
     qty: item.quantity || item.qty || 1,
     contractor_price: item.contractor_price || 0,
     client_price: item.client_sum && item.quantity ? Number(item.client_sum) / Number(item.quantity || 1) : 0,
-    comment: item.comment || ''
+    comment: item.comment || '',
+    width: item.data?.width || null,
+    height: item.data?.height || null
   }));
   const data = order?.data && typeof order.data === 'object' ? order.data : {};
   const rows = Array.isArray(data.rows) ? data.rows : [];
@@ -49,7 +46,9 @@ function orderRows(order, orderItems = []) {
     qty: row.qty || row.quantity || 1,
     contractor_price: row.price || row.contractor_price || 0,
     client_price: row.client_price || row.clientPrice || row.client_sum || 0,
-    comment: row.comment || row.note || ''
+    comment: row.comment || row.note || '',
+    width: row.width || row.w || row.data?.width || null,
+    height: row.height || row.h || row.data?.height || null
   }));
 }
 function ensureStyles() {
@@ -72,27 +71,20 @@ function panelHost() {
   return card.querySelector('.v4-order-detail-panel') || card;
 }
 async function fetchBundle(orderId) {
-  const orderResponse = await supabaseClient.from('leader_orders').select('*').eq('id', orderId).single();
+  const orderResponse = await supabaseClient.from('leader_orders').select(ORDER_FIELDS).eq('id', orderId).single();
   if (orderResponse.error || !orderResponse.data) throw orderResponse.error || new Error('Заказ не найден');
   const order = orderResponse.data;
   const [itemsResponse, jobsResponse, installsResponse, eventsResponse, historyResponse] = await Promise.all([
-    supabaseClient.from('leader_order_items').select('*').eq('order_id', orderId).order('created_at', { ascending: true }),
-    supabaseClient.from('leader_production_jobs').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
-    supabaseClient.from('leader_installation_jobs').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
-    supabaseClient.from('leader_production_events').select('*').eq('order_id', orderId).order('created_at', { ascending: false }).limit(30),
-    supabaseClient.from('leader_order_status_history').select('*').eq('order_id', orderId).order('created_at', { ascending: false }).limit(20)
+    supabaseClient.from('leader_order_items').select(ORDER_ITEM_FIELDS).eq('order_id', orderId).order('created_at', { ascending: true }).limit(120),
+    supabaseClient.from('leader_production_jobs').select(PRODUCTION_JOB_FIELDS).eq('order_id', orderId).order('created_at', { ascending: false }).limit(20),
+    supabaseClient.from('leader_installation_jobs').select(INSTALLATION_JOB_FIELDS).eq('order_id', orderId).order('created_at', { ascending: false }).limit(20),
+    supabaseClient.from('leader_production_events').select(PRODUCTION_EVENT_FIELDS).eq('order_id', orderId).order('created_at', { ascending: false }).limit(30),
+    supabaseClient.from('leader_order_status_history').select(ORDER_HISTORY_FIELDS).eq('order_id', orderId).order('created_at', { ascending: false }).limit(20)
   ]);
   if (itemsResponse.error) throw itemsResponse.error;
   if (jobsResponse.error) throw jobsResponse.error;
   if (installsResponse.error) throw installsResponse.error;
-  return {
-    order,
-    items: itemsResponse.data || [],
-    jobs: jobsResponse.data || [],
-    installs: installsResponse.data || [],
-    events: eventsResponse.error ? [] : eventsResponse.data || [],
-    history: historyResponse.error ? [] : historyResponse.data || []
-  };
+  return { order, items: itemsResponse.data || [], jobs: jobsResponse.data || [], installs: installsResponse.data || [], events: eventsResponse.error ? [] : eventsResponse.data || [], history: historyResponse.error ? [] : historyResponse.data || [] };
 }
 function renderJobs(jobs) {
   if (!jobs.length) return '<div class="v4-production-empty">Производственное задание ещё не создано.</div>';
@@ -155,21 +147,13 @@ async function createProductionJob(orderId) {
       file_url: order.layout_link || data.layout_link || null,
       technical_task: order.production_comment || data.production_comment || data.comment || '',
       internal_comment: order.internal_comment || ''
-    }).select('*').single();
+    }).select(PRODUCTION_JOB_FIELDS).single();
     if (jobResponse.error || !jobResponse.data) throw jobResponse.error || new Error('Производственное задание не создано');
     const job = jobResponse.data;
     if (rows.length) {
-      const items = rows.map((row) => ({
-        job_id: job.id,
-        order_id: order.id,
-        name: row.name || 'Позиция',
-        unit: row.unit || 'шт',
-        qty: Number(row.qty || 1),
-        contractor_price: Number(row.contractor_price || 0),
-        client_price: Number(row.client_price || 0),
-        comment: row.comment || ''
-      }));
-      await supabaseClient.from('leader_production_job_items').insert(items);
+      const items = rows.map((row) => ({ job_id: job.id, order_id: order.id, name: row.name || 'Позиция', unit: row.unit || 'шт', qty: Number(row.qty || 1), width: row.width || null, height: row.height || null, contractor_price: Number(row.contractor_price || 0), client_price: Number(row.client_price || 0), comment: row.comment || '' }));
+      const itemsResponse = await supabaseClient.from('leader_production_job_items').insert(items);
+      if (itemsResponse.error) throw itemsResponse.error;
     }
     await Promise.all([
       supabaseClient.from('leader_orders').update({ production_status: 'Не передано', current_stage: 'Производственное задание создано', progress_percent: Math.max(Number(order.progress_percent || 0), 35), updated_at: nowIso(), stage_updated_at: nowIso() }).eq('id', order.id),
@@ -182,9 +166,7 @@ async function createProductionJob(orderId) {
   } catch (error) {
     toast(friendlyError(error));
     setStatus(`Ошибка производства: ${friendlyError(error)}`, 'error');
-  } finally {
-    busy = false;
-  }
+  } finally { busy = false; }
 }
 async function saveProductionInfo(orderId) {
   if (busy) return;
@@ -197,7 +179,7 @@ async function saveProductionInfo(orderId) {
     data.install_place = document.getElementById('prodInstallPlace')?.value?.trim() || '';
     data.production_comment = document.getElementById('prodProductionComment')?.value?.trim() || '';
     const layoutLink = document.getElementById('prodLayoutLink')?.value?.trim() || '';
-    const response = await supabaseClient.from('leader_orders').update({ layout_link: layoutLink || null, production_comment: data.production_comment || null, installation_address: data.install_place || order.installation_address || null, data, updated_at: nowIso() }).eq('id', orderId).select('*').single();
+    const response = await supabaseClient.from('leader_orders').update({ layout_link: layoutLink || null, production_comment: data.production_comment || null, installation_address: data.install_place || order.installation_address || null, data, updated_at: nowIso() }).eq('id', orderId);
     if (response.error) throw response.error;
     await supabaseClient.from('leader_order_comments').insert({ order_id: orderId, comment_type: 'production', body: 'Обновлены файлы/место размещения/производственный комментарий', created_by: v4State.user?.id || null, created_by_email: v4State.user?.email || null });
     toast('Производственная информация сохранена');
@@ -207,9 +189,7 @@ async function saveProductionInfo(orderId) {
   } catch (error) {
     toast(friendlyError(error));
     setStatus(`Ошибка сохранения: ${friendlyError(error)}`, 'error');
-  } finally {
-    busy = false;
-  }
+  } finally { busy = false; }
 }
 async function quickOrderStatus(orderId, status, productionStatus, progress) {
   if (busy) return;
@@ -220,7 +200,7 @@ async function quickOrderStatus(orderId, status, productionStatus, progress) {
     const patch = { status, production_status: productionStatus, progress_percent: Number(progress || 0), current_stage: status, updated_at: nowIso(), stage_updated_at: nowIso() };
     if (status === 'Готово') patch.ready_at = nowIso();
     if (status === 'Выдано') patch.issued_at = nowIso();
-    const response = await supabaseClient.from('leader_orders').update(patch).eq('id', orderId).select('*').single();
+    const response = await supabaseClient.from('leader_orders').update(patch).eq('id', orderId);
     if (response.error) throw response.error;
     await supabaseClient.from('leader_order_status_history').insert({ order_id: orderId, old_status: oldStatus, new_status: status, comment: `Быстрое изменение этапа: ${status}`, changed_by: v4State.user?.id || null, changed_by_email: v4State.user?.email || null });
     toast(`Заказ: ${status}`);
@@ -230,21 +210,19 @@ async function quickOrderStatus(orderId, status, productionStatus, progress) {
   } catch (error) {
     toast(friendlyError(error));
     setStatus(`Ошибка статуса: ${friendlyError(error)}`, 'error');
-  } finally {
-    busy = false;
-  }
+  } finally { busy = false; }
 }
 async function updateProductionJobStatus(jobId, status) {
   if (busy) return;
   busy = true;
   try {
-    const jobResponse = await supabaseClient.from('leader_production_jobs').select('*').eq('id', jobId).single();
+    const jobResponse = await supabaseClient.from('leader_production_jobs').select('id,order_id,production_status').eq('id', jobId).single();
     if (jobResponse.error || !jobResponse.data) throw jobResponse.error || new Error('Задание не найдено');
     const job = jobResponse.data;
     const patch = { production_status: status, updated_at: nowIso() };
     if (status === 'Передано в производство') patch.sent_to_contractor_at = nowIso();
     if (status === 'Готово') patch.ready_at = nowIso();
-    const response = await supabaseClient.from('leader_production_jobs').update(patch).eq('id', jobId).select('*').single();
+    const response = await supabaseClient.from('leader_production_jobs').update(patch).eq('id', jobId);
     if (response.error) throw response.error;
     await Promise.all([
       supabaseClient.from('leader_orders').update({ production_status: status, current_stage: `Производство: ${status}`, progress_percent: status === 'Готово' ? 85 : status === 'В работе' ? 60 : 45, updated_at: nowIso(), stage_updated_at: nowIso() }).eq('id', job.order_id),
@@ -256,21 +234,19 @@ async function updateProductionJobStatus(jobId, status) {
   } catch (error) {
     toast(friendlyError(error));
     setStatus(`Ошибка производства: ${friendlyError(error)}`, 'error');
-  } finally {
-    busy = false;
-  }
+  } finally { busy = false; }
 }
 async function updateInstallStatus(jobId, status) {
   if (busy) return;
   busy = true;
   try {
-    const jobResponse = await supabaseClient.from('leader_installation_jobs').select('*').eq('id', jobId).single();
+    const jobResponse = await supabaseClient.from('leader_installation_jobs').select('id,order_id,install_status').eq('id', jobId).single();
     if (jobResponse.error || !jobResponse.data) throw jobResponse.error || new Error('Монтаж не найден');
     const job = jobResponse.data;
     const patch = { install_status: status, updated_at: nowIso() };
     if (status === 'В работе') patch.started_at = nowIso();
     if (status === 'Выполнен') patch.completed_at = nowIso();
-    const response = await supabaseClient.from('leader_installation_jobs').update(patch).eq('id', jobId).select('*').single();
+    const response = await supabaseClient.from('leader_installation_jobs').update(patch).eq('id', jobId);
     if (response.error) throw response.error;
     await Promise.all([
       supabaseClient.from('leader_orders').update({ installation_status: status, current_stage: `Монтаж: ${status}`, progress_percent: status === 'Выполнен' ? 95 : 75, updated_at: nowIso(), stage_updated_at: nowIso() }).eq('id', job.order_id),
@@ -282,9 +258,7 @@ async function updateInstallStatus(jobId, status) {
   } catch (error) {
     toast(friendlyError(error));
     setStatus(`Ошибка монтажа: ${friendlyError(error)}`, 'error');
-  } finally {
-    busy = false;
-  }
+  } finally { busy = false; }
 }
 function scheduleRender(orderId, force = false) {
   currentOrderId = orderId || currentOrderId || window.LeaderV4CurrentOrderId || '';
@@ -298,11 +272,7 @@ function boot() {
   booted = true;
   document.addEventListener('click', (event) => {
     const openOrder = event.target.closest?.('[data-open-order]');
-    if (openOrder?.dataset.openOrder) {
-      currentOrderId = openOrder.dataset.openOrder;
-      window.LeaderV4CurrentOrderId = currentOrderId;
-      scheduleRender(currentOrderId, true);
-    }
+    if (openOrder?.dataset.openOrder) { currentOrderId = openOrder.dataset.openOrder; window.LeaderV4CurrentOrderId = currentOrderId; scheduleRender(currentOrderId, true); }
     const create = event.target.closest?.('[data-create-production-job]');
     if (create) { event.preventDefault(); event.stopPropagation(); createProductionJob(create.dataset.createProductionJob); return; }
     const refresh = event.target.closest?.('[data-production-refresh]');
@@ -316,10 +286,7 @@ function boot() {
     const install = event.target.closest?.('[data-install-job-status]');
     if (install) { event.preventDefault(); event.stopPropagation(); updateInstallStatus(install.dataset.installJobStatus, install.dataset.status); }
   }, true);
-  document.addEventListener('leader-v4-order-updated', (event) => {
-    const id = event.detail?.order?.id || currentOrderId;
-    if (id) scheduleRender(id, true);
-  });
+  document.addEventListener('leader-v4-order-updated', (event) => { const id = event.detail?.order?.id || currentOrderId; if (id) scheduleRender(id, true); });
   document.addEventListener('leader-v4:route-change', () => scheduleRender('', false));
 }
 boot();
