@@ -1,5 +1,5 @@
 const MODULES = {
-  management_dashboard: { label: 'Дашборд', file: './management-dashboard-v1.js?v=20260619-lazy-2', before: 'workdesk' },
+  management_dashboard: { label: 'Дашборд', file: './management-dashboard-v2.js?v=20260619-safe-1', before: 'workdesk' },
   workdesk: { label: 'Рабочий стол', file: './manager-workdesk-v1.js?v=20260619-lazy-2', before: 'leads' },
   order_control: { label: 'Контроль заказов', file: './order-control-v1.js?v=20260619-lazy-2', after: 'orders' },
   finance_control: { label: 'Финансы', file: './finance-control-v1.js?v=20260619-lazy-2', after: 'order_control' },
@@ -40,13 +40,8 @@ function insertButton(key, config) {
   else menu.appendChild(button);
 }
 
-function ensureMenu() {
-  Object.entries(MODULES).forEach(([key, config]) => insertButton(key, config));
-}
-
-function workspace() {
-  return document.getElementById('crmWorkspace') || document.querySelector('main') || document.body;
-}
+function ensureMenu() { Object.entries(MODULES).forEach(([key, config]) => insertButton(key, config)); }
+function workspace() { return document.getElementById('crmWorkspace') || document.querySelector('main') || document.body; }
 
 function ensurePlaceholder(key, text = 'Раздел загружается...') {
   ensureStyles();
@@ -79,53 +74,32 @@ async function loadAndOpen(key) {
   if (!config) return;
   ensureMenu();
   showOnly(key);
-  if (loaded.has(key)) {
-    window.setTimeout(() => tabButton(key)?.click(), 0);
-    return;
-  }
+  if (loaded.has(key)) { window.setTimeout(() => tabButton(key)?.click(), 0); return; }
   if (loading.has(key)) return loading.get(key);
   ensurePlaceholder(key, 'Загружаю модуль раздела. Это происходит только при первом открытии вкладки.');
   showOnly(key);
   const promise = importWithTimeout(config.file, key)
-    .then(() => {
-      loaded.add(key);
-      loading.delete(key);
-      window.setTimeout(() => tabButton(key)?.click(), 50);
-    })
-    .catch((error) => {
-      loading.delete(key);
-      console.warn('[leader-v4] lazy section load error', key, error);
-      ensurePlaceholder(key, error?.message || 'Раздел не загрузился. Попробуйте повторить.');
-      showOnly(key);
-    });
+    .then(() => { loaded.add(key); loading.delete(key); window.setTimeout(() => tabButton(key)?.click(), 50); })
+    .catch((error) => { loading.delete(key); console.warn('[leader-v4] lazy section load error', key, error); ensurePlaceholder(key, error?.message || 'Раздел не загрузился. Попробуйте повторить.'); showOnly(key); });
   loading.set(key, promise);
   return promise;
 }
 
-function scheduleMenu() {
-  window.clearTimeout(menuTimer);
-  menuTimer = window.setTimeout(ensureMenu, 120);
-}
+function scheduleMenu() { window.clearTimeout(menuTimer); menuTimer = window.setTimeout(ensureMenu, 120); }
 
 function bind() {
   document.addEventListener('click', (event) => {
     const retry = event.target.closest?.('[data-lazy-retry]');
     if (retry) {
       const key = retry.dataset.lazyRetry;
-      loaded.delete(key);
-      loading.delete(key);
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      loadAndOpen(key);
-      return;
+      loaded.delete(key); loading.delete(key);
+      event.preventDefault(); event.stopImmediatePropagation(); loadAndOpen(key); return;
     }
     const button = event.target.closest?.('[data-v4-tab-button]');
     const key = button?.dataset.v4TabButton;
     if (!key || !MODULES[key]) return;
     if (loaded.has(key)) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    loadAndOpen(key);
+    event.preventDefault(); event.stopImmediatePropagation(); loadAndOpen(key);
   }, true);
   document.addEventListener('leader-v4:crm-ready', scheduleMenu);
   document.addEventListener('leader-v4:tab-opened', scheduleMenu);
