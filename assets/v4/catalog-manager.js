@@ -3,7 +3,8 @@ import { timeout, friendlyError } from './api.js';
 import { v4State } from './state.js';
 import { byId, setStatus, toast } from './ui.js';
 
-const CATALOG_FIELDS = 'id,category,name,unit,contractor_price,is_active,sort_order,description,item_type,markup_percent,min_client_price,default_client_price,calculation_mode,settings,created_at,updated_at';
+const CATALOG_FIELDS = 'id,category,name,unit,contractor_price,is_active,sort_order,item_type,markup_percent,min_client_price,default_client_price,calculation_mode,settings';
+const CATALOG_SAVE_FIELDS = 'id,category,name,unit,contractor_price,is_active,sort_order,description,item_type,markup_percent,min_client_price,default_client_price,calculation_mode,settings,created_at,updated_at';
 const LOG_FIELDS = 'id,catalog_id,changed_by,changed_by_email,change_type,reason,old_contractor_price,new_contractor_price,old_markup_percent,new_markup_percent,old_min_client_price,new_min_client_price,old_default_client_price,new_default_client_price,old_calculation_mode,new_calculation_mode,old_is_active,new_is_active,old_values,new_values,created_at';
 const GROUPS = ['Все', 'banner', 'banner_extra', 'film', 'film_extra', 'sheet', 'photo', 'photo_extra', 'service', 'other'];
 const EDIT_GROUPS = GROUPS.filter((group) => group !== 'Все');
@@ -30,11 +31,7 @@ function money(value) {
 
 function formatDate(value) {
   if (!value) return '—';
-  try {
-    return new Date(value).toLocaleString('ru-RU');
-  } catch (_) {
-    return String(value);
-  }
+  try { return new Date(value).toLocaleString('ru-RU'); } catch (_) { return String(value); }
 }
 
 function parseNum(value) {
@@ -172,65 +169,19 @@ function renderRow(row) {
       <td><input id="cat_type_${esc(row.id)}" value="${esc(row.item_type || 'Изготовление')}"></td>
       <td><label class="v4-mini-check"><input id="cat_active_${esc(row.id)}" type="checkbox" ${row.is_active ? 'checked' : ''}> активна</label></td>
       <td class="v4-catalog-actions"><button type="button" data-catalog-save="${esc(row.id)}" class="v4-primary">Сохранить</button><button type="button" data-catalog-history="${esc(row.id)}">История</button></td>
-    </tr>
-  `;
+    </tr>`;
 }
 
 function renderCreateForm() {
-  return `
-    <details class="v4-catalog-create">
-      <summary>Добавить новую позицию</summary>
-      <div class="v4-catalog-create-grid">
-        <label>Название<input id="newCatName" placeholder="Например: Баннерная печать 510"></label>
-        <label>Категория<input id="newCatCategory" placeholder="Широкоформатная печать"></label>
-        <label>Ед.<input id="newCatUnit" value="м²"></label>
-        <label>Цена подрядчика<input id="newCatPrice" type="number" min="0" step="1" value="0"></label>
-        <label>Наценка, %<input id="newCatMarkup" type="number" step="1" value="30"></label>
-        <label>Группа калькулятора<select id="newCatGroup">${optionList(EDIT_GROUPS, 'other')}</select></label>
-      </div>
-      <div class="v4-form-actions"><button id="createCatalogItemBtn" type="button" class="v4-primary">Добавить позицию</button></div>
-    </details>
-  `;
+  return `<details class="v4-catalog-create"><summary>Добавить новую позицию</summary><div class="v4-catalog-create-grid"><label>Название<input id="newCatName" placeholder="Например: Баннерная печать 510"></label><label>Категория<input id="newCatCategory" placeholder="Широкоформатная печать"></label><label>Ед.<input id="newCatUnit" value="м²"></label><label>Цена подрядчика<input id="newCatPrice" type="number" min="0" step="1" value="0"></label><label>Наценка, %<input id="newCatMarkup" type="number" step="1" value="30"></label><label>Группа калькулятора<select id="newCatGroup">${optionList(EDIT_GROUPS, 'other')}</select></label></div><div class="v4-form-actions"><button id="createCatalogItemBtn" type="button" class="v4-primary">Добавить позицию</button></div></details>`;
 }
 
 function renderHistoryPanel() {
   if (!historyCatalogId) return '';
   const row = rows.find((item) => item.id === historyCatalogId);
   const title = row?.name || 'позиция';
-  const rowsHtml = historyBusy
-    ? '<tr><td colspan="7">Загружаю историю...</td></tr>'
-    : historyError
-      ? `<tr><td colspan="7">${esc(historyError)}</td></tr>`
-      : historyRows.length
-        ? historyRows.map((log) => `
-          <tr>
-            <td>${formatDate(log.created_at)}</td>
-            <td>${esc(log.changed_by_email || '—')}</td>
-            <td>${money(log.old_contractor_price)} → ${money(log.new_contractor_price)}</td>
-            <td>${log.old_markup_percent ?? '—'}% → ${log.new_markup_percent ?? '—'}%</td>
-            <td>${money(log.old_min_client_price)} → ${money(log.new_min_client_price)}</td>
-            <td>${log.old_is_active === null || log.old_is_active === undefined ? '—' : (log.old_is_active ? 'активна' : 'выкл.')} → ${log.new_is_active ? 'активна' : 'выкл.'}</td>
-            <td>${esc(log.reason || log.change_type || 'Изменение')}</td>
-          </tr>
-        `).join('')
-        : '<tr><td colspan="7">Истории изменений пока нет.</td></tr>';
-  return `
-    <div class="v4-catalog-history">
-      <div class="v4-subcard-head">
-        <div>
-          <h3>История изменений: ${esc(title)}</h3>
-          <p>Показываются последние изменения цены, наценки, минимальной цены и активности.</p>
-        </div>
-        <button type="button" data-catalog-history-close>Закрыть историю</button>
-      </div>
-      <div class="v4-table-wrap">
-        <table class="v4-table v4-catalog-history-table">
-          <thead><tr><th>Дата</th><th>Кто</th><th>Цена подрядчика</th><th>Наценка</th><th>Мин. цена</th><th>Активность</th><th>Причина</th></tr></thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-      </div>
-    </div>
-  `;
+  const rowsHtml = historyBusy ? '<tr><td colspan="7">Загружаю историю...</td></tr>' : historyError ? `<tr><td colspan="7">${esc(historyError)}</td></tr>` : historyRows.length ? historyRows.map((log) => `<tr><td>${formatDate(log.created_at)}</td><td>${esc(log.changed_by_email || '—')}</td><td>${money(log.old_contractor_price)} → ${money(log.new_contractor_price)}</td><td>${log.old_markup_percent ?? '—'}% → ${log.new_markup_percent ?? '—'}%</td><td>${money(log.old_min_client_price)} → ${money(log.new_min_client_price)}</td><td>${log.old_is_active === null || log.old_is_active === undefined ? '—' : (log.old_is_active ? 'активна' : 'выкл.')} → ${log.new_is_active ? 'активна' : 'выкл.'}</td><td>${esc(log.reason || log.change_type || 'Изменение')}</td></tr>`).join('') : '<tr><td colspan="7">Истории изменений пока нет.</td></tr>';
+  return `<div class="v4-catalog-history"><div class="v4-subcard-head"><div><h3>История изменений: ${esc(title)}</h3><p>Показываются последние изменения цены, наценки, минимальной цены и активности.</p></div><button type="button" data-catalog-history-close>Закрыть историю</button></div><div class="v4-table-wrap"><table class="v4-table v4-catalog-history-table"><thead><tr><th>Дата</th><th>Кто</th><th>Цена подрядчика</th><th>Наценка</th><th>Мин. цена</th><th>Активность</th><th>Причина</th></tr></thead><tbody>${rowsHtml}</tbody></table></div></div>`;
 }
 
 function render() {
@@ -246,36 +197,7 @@ function render() {
   }
   const visible = filteredRows();
   const activeCount = rows.filter((row) => row.is_active).length;
-  section.innerHTML = `
-    <div class="v4-section-head">
-      <div>
-        <h2>Номенклатура и цены</h2>
-        <p>Здесь редактируются цены подрядчика, наценка, активность и группа калькулятора. Расчёт заявки берёт цены отсюда.</p>
-      </div>
-      <button id="reloadCatalogBtn" type="button" class="v4-primary">Обновить справочник</button>
-    </div>
-    <div class="v4-lead-stats">
-      <div><span>Всего позиций</span><b>${rows.length}</b></div>
-      <div><span>Активных</span><b>${activeCount}</b></div>
-      <div><span>Категорий</span><b>${Math.max(0, categories().length - 1)}</b></div>
-      <div><span>Показано</span><b>${visible.length}</b></div>
-    </div>
-    <div class="v4-filters v4-catalog-filters">
-      <label>Статус<select id="catalogStatusFilter"><option value="active" ${filter.status === 'active' ? 'selected' : ''}>Только активные</option><option value="all" ${filter.status === 'all' ? 'selected' : ''}>Все</option><option value="inactive" ${filter.status === 'inactive' ? 'selected' : ''}>Отключённые</option></select></label>
-      <label>Категория<select id="catalogCategoryFilter">${categories().map((category) => `<option value="${esc(category)}" ${filter.category === category ? 'selected' : ''}>${esc(category)}</option>`).join('')}</select></label>
-      <label>Группа калькулятора<select id="catalogGroupFilter">${optionList(GROUPS, filter.group)}</select></label>
-      <label>Поиск<input id="catalogSearchFilter" type="search" value="${esc(filter.search)}" placeholder="Название, категория, тип"></label>
-    </div>
-    ${errorText ? `<div class="v4-empty is-error">${esc(errorText)}</div>` : ''}
-    ${renderHistoryPanel()}
-    ${renderCreateForm()}
-    <div class="v4-table-wrap v4-catalog-table-wrap">
-      <table class="v4-table v4-catalog-table">
-        <thead><tr><th>Название</th><th>Категория</th><th>Ед.</th><th>Подрядчик</th><th>Наценка %</th><th>Мин.</th><th>Цена по умолч.</th><th>Группа</th><th>Режим</th><th>Тип</th><th>Активность</th><th></th></tr></thead>
-        <tbody>${busy ? '<tr><td colspan="12">Загружаю номенклатуру...</td></tr>' : visible.length ? visible.map(renderRow).join('') : '<tr><td colspan="12">Позиции не найдены.</td></tr>'}</tbody>
-      </table>
-    </div>
-  `;
+  section.innerHTML = `<div class="v4-section-head"><div><h2>Номенклатура и цены</h2><p>Здесь редактируются цены подрядчика, наценка, активность и группа калькулятора. Расчёт заявки берёт цены отсюда.</p></div><button id="reloadCatalogBtn" type="button" class="v4-primary">Обновить справочник</button></div><div class="v4-lead-stats"><div><span>Всего позиций</span><b>${rows.length}</b></div><div><span>Активных</span><b>${activeCount}</b></div><div><span>Категорий</span><b>${Math.max(0, categories().length - 1)}</b></div><div><span>Показано</span><b>${visible.length}</b></div></div><div class="v4-filters v4-catalog-filters"><label>Статус<select id="catalogStatusFilter"><option value="active" ${filter.status === 'active' ? 'selected' : ''}>Только активные</option><option value="all" ${filter.status === 'all' ? 'selected' : ''}>Все</option><option value="inactive" ${filter.status === 'inactive' ? 'selected' : ''}>Отключённые</option></select></label><label>Категория<select id="catalogCategoryFilter">${categories().map((category) => `<option value="${esc(category)}" ${filter.category === category ? 'selected' : ''}>${esc(category)}</option>`).join('')}</select></label><label>Группа калькулятора<select id="catalogGroupFilter">${optionList(GROUPS, filter.group)}</select></label><label>Поиск<input id="catalogSearchFilter" type="search" value="${esc(filter.search)}" placeholder="Название, категория, тип"></label></div>${errorText ? `<div class="v4-empty is-error">${esc(errorText)}</div>` : ''}${renderHistoryPanel()}${renderCreateForm()}<div class="v4-table-wrap v4-catalog-table-wrap"><table class="v4-table v4-catalog-table"><thead><tr><th>Название</th><th>Категория</th><th>Ед.</th><th>Подрядчик</th><th>Наценка %</th><th>Мин.</th><th>Цена по умолч.</th><th>Группа</th><th>Режим</th><th>Тип</th><th>Активность</th><th></th></tr></thead><tbody>${busy ? '<tr><td colspan="12">Загружаю номенклатуру...</td></tr>' : visible.length ? visible.map(renderRow).join('') : '<tr><td colspan="12">Позиции не найдены.</td></tr>'}</tbody></table></div>`;
 }
 
 export async function loadCatalogManager(force = false) {
@@ -291,18 +213,14 @@ export async function loadCatalogManager(force = false) {
   errorText = '';
   render();
   try {
-    const response = await timeout(
-      supabaseClient.from('leader_catalog').select(CATALOG_FIELDS).order('sort_order', { ascending: true }).order('name', { ascending: true }).limit(500),
-      25000,
-      'Номенклатура не загрузилась за 25 секунд'
-    );
+    const response = await supabaseClient.from('leader_catalog').select(CATALOG_FIELDS).order('sort_order', { ascending: true }).order('name', { ascending: true }).limit(120);
     if (response.error) throw response.error;
     rows = (response.data || []).map(normalize);
     loaded = true;
     setStatus(`Номенклатура загружена: ${rows.length} позиций`, 'good');
   } catch (error) {
-    errorText = friendlyError(error);
-    setStatus(`Ошибка номенклатуры: ${errorText}`, 'error');
+    errorText = `Номенклатура временно не загрузилась: ${friendlyError(error)}. Можно повторить загрузку.`;
+    setStatus('Номенклатура временно не загрузилась', 'warn');
   } finally {
     busy = false;
     render();
@@ -317,16 +235,12 @@ async function loadHistory(rowId) {
   historyError = '';
   render();
   try {
-    const response = await timeout(
-      supabaseClient.from('leader_catalog_price_logs').select(LOG_FIELDS).eq('catalog_id', rowId).order('created_at', { ascending: false }).limit(30),
-      12000,
-      'История изменений не загрузилась за 12 секунд'
-    );
+    const response = await supabaseClient.from('leader_catalog_price_logs').select(LOG_FIELDS).eq('catalog_id', rowId).order('created_at', { ascending: false }).limit(20);
     if (response.error) throw response.error;
     historyRows = response.data || [];
   } catch (error) {
     historyError = friendlyError(error);
-    setStatus(`Ошибка истории цен: ${historyError}`, 'error');
+    setStatus(`Ошибка истории цен: ${historyError}`, 'warn');
   } finally {
     historyBusy = false;
     render();
@@ -339,11 +253,7 @@ async function saveRow(rowId) {
   const patch = rowPayload(rowId);
   try {
     setStatus('Сохраняю позицию номенклатуры...', 'warn');
-    const response = await timeout(
-      supabaseClient.from('leader_catalog').update(patch).eq('id', rowId).select(CATALOG_FIELDS).single(),
-      12000,
-      'Позиция не сохранилась за 12 секунд'
-    );
+    const response = await timeout(supabaseClient.from('leader_catalog').update(patch).eq('id', rowId).select(CATALOG_SAVE_FIELDS).single(), 20000, 'Позиция не сохранилась за 20 секунд');
     if (response.error) throw response.error;
     const updated = normalize(response.data);
     rows = rows.map((row) => row.id === rowId ? updated : row);
@@ -359,40 +269,28 @@ async function saveRow(rowId) {
 }
 
 async function createRow() {
-  const name = byId('newCatName')?.value?.trim() || '';
-  if (!name) {
-    toast('Введите название позиции');
-    return;
-  }
-  const group = byId('newCatGroup')?.value || 'other';
   const payload = {
-    name,
     category: byId('newCatCategory')?.value?.trim() || 'Без категории',
+    name: byId('newCatName')?.value?.trim() || 'Новая позиция',
     unit: byId('newCatUnit')?.value?.trim() || 'шт',
     contractor_price: parseNum(byId('newCatPrice')?.value || 0),
-    markup_percent: parseNum(byId('newCatMarkup')?.value || 30),
+    markup_percent: parseNum(byId('newCatMarkup')?.value || 0),
     min_client_price: 0,
     default_client_price: null,
     calculation_mode: 'markup',
-    item_type: group.includes('extra') ? 'Доп. услуга' : 'Изготовление',
+    item_type: 'Изготовление',
     is_active: true,
     sort_order: rows.length + 1,
-    settings: { calculator_group: group }
+    settings: { calculator_group: byId('newCatGroup')?.value || 'other' }
   };
   try {
     setStatus('Добавляю позицию номенклатуры...', 'warn');
-    const response = await timeout(
-      supabaseClient.from('leader_catalog').insert(payload).select(CATALOG_FIELDS).single(),
-      12000,
-      'Позиция не добавилась за 12 секунд'
-    );
+    const response = await timeout(supabaseClient.from('leader_catalog').insert(payload).select(CATALOG_SAVE_FIELDS).single(), 20000, 'Позиция не добавилась за 20 секунд');
     if (response.error) throw response.error;
-    const created = normalize(response.data);
-    rows = [created, ...rows];
-    await logChange({ ...created, contractor_price: null, markup_percent: null, is_active: null }, created, 'Создание позиции из CRM v4');
+    rows = [normalize(response.data), ...rows];
     loaded = true;
     render();
-    setStatus('Позиция добавлена', 'good');
+    setStatus('Позиция номенклатуры добавлена', 'good');
     toast('Позиция добавлена');
   } catch (error) {
     setStatus(`Ошибка добавления позиции: ${friendlyError(error)}`, 'error');
@@ -400,53 +298,54 @@ async function createRow() {
   }
 }
 
-function bindEvents() {
-  document.addEventListener('leader-v4:crm-ready', () => {
-    ensureSection();
-    render();
-  });
-  document.addEventListener('leader-v4:tab-opened', (event) => {
-    if (event.detail?.tab === 'catalog') loadCatalogManager(false);
-  });
-  document.addEventListener('DOMContentLoaded', () => {
-    ensureSection();
-    render();
-    if (v4State.crmReady && document.body.dataset.v4Tab === 'catalog') loadCatalogManager(false);
-  });
+function bindCatalogEvents() {
   document.addEventListener('click', async (event) => {
-    if (event.target.closest('#reloadCatalogBtn')) await loadCatalogManager(true);
-    if (event.target.closest('#createCatalogItemBtn')) await createRow();
-    if (event.target.closest('[data-catalog-history-close]')) {
+    if (event.target.id === 'reloadCatalogBtn') await loadCatalogManager(true);
+    const saveId = event.target.dataset?.catalogSave;
+    if (saveId) await saveRow(saveId);
+    const historyId = event.target.dataset?.catalogHistory;
+    if (historyId) await loadHistory(historyId);
+    if (event.target.dataset?.catalogHistoryClose !== undefined) {
       historyCatalogId = null;
       historyRows = [];
       historyError = '';
       render();
     }
-    const history = event.target.closest('button[data-catalog-history]');
-    if (history) await loadHistory(history.dataset.catalogHistory);
-    const save = event.target.closest('button[data-catalog-save]');
-    if (save) await saveRow(save.dataset.catalogSave);
+    if (event.target.id === 'createCatalogItemBtn') await createRow();
   });
   document.addEventListener('input', (event) => {
-    if (event.target.closest('#catalogSearchFilter')) {
-      filter.search = event.target.value || '';
+    if (event.target.id === 'catalogSearchFilter') {
+      filter.search = event.target.value;
       render();
     }
   });
   document.addEventListener('change', (event) => {
-    if (event.target.closest('#catalogStatusFilter')) {
-      filter.status = event.target.value || 'active';
+    if (event.target.id === 'catalogCategoryFilter') {
+      filter.category = event.target.value;
       render();
     }
-    if (event.target.closest('#catalogCategoryFilter')) {
-      filter.category = event.target.value || 'Все';
+    if (event.target.id === 'catalogStatusFilter') {
+      filter.status = event.target.value;
       render();
     }
-    if (event.target.closest('#catalogGroupFilter')) {
-      filter.group = event.target.value || 'Все';
+    if (event.target.id === 'catalogGroupFilter') {
+      filter.group = event.target.value;
       render();
     }
   });
 }
 
-bindEvents();
+function bootCatalogManager() {
+  ensureSection();
+  render();
+  bindCatalogEvents();
+  document.addEventListener('leader-v4:crm-ready', () => render());
+  document.addEventListener('leader-v4:tab-opened', (event) => {
+    if (event.detail?.tab === 'catalog' || document.body.dataset.v4Tab === 'catalog') loadCatalogManager(false);
+  });
+}
+
+if (!window.LeaderV4CatalogManagerBooted) {
+  window.LeaderV4CatalogManagerBooted = true;
+  bootCatalogManager();
+}
