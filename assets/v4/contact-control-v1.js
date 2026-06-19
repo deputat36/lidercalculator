@@ -1,7 +1,11 @@
-import { v4State } from './state.js';
+import { supabaseClient } from './supabase-client.js';
+import { timeout, friendlyError } from './api.js';
+import { v4State, setState } from './state.js';
+import { setStatus, toast } from './ui.js';
 import { openLeadRoute } from './router.js';
 
 const FINISHED = new Set(['Создан заказ', 'Отказ', 'Спам', 'Не отвечает', 'Дорого', 'Передумал']);
+const LEAD_FIELDS = 'id,created_at,name,phone,source,service,message,status,lead_quality,estimated_amount,next_contact_at,page_url,budget,city,converted_order_id,converted_client_id';
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
@@ -42,6 +46,65 @@ function rows() {
     });
 }
 
+function nextContactDate(kind) {
+  const date = new Date();
+  if (kind === 'today17') date.setHours(17, 0, 0, 0);
+  if (kind === 'tomorrow') {
+    date.setDate(date.getDate() + 1);
+    date.setHours(10, 0, 0, 0);
+  }
+  if (kind === 'plus3d') {
+    date.setDate(date.getDate() + 3);
+    date.setHours(10, 0, 0, 0);
+  }
+  if (kind === 'plus7d') {
+    date.setDate(date.getDate() + 7);
+    date.setHours(10, 0, 0, 0);
+  }
+  return date;
+}
+
+function mergeLead(updatedLead) {
+  if (!updatedLead?.id) return;
+  setState({
+    leads: (v4State.leads || []).map((lead) => (lead.id === updatedLead.id ? { ...lead, ...updatedLead } : lead)),
+    currentLead: v4State.currentLead?.id === updatedLead.id ? { ...v4State.currentLead, ...updatedLead } : v4State.currentLead
+  });
+}
+
+async function saveQuickContact(leadId, kind, button) {
+  if (!leadId || !kind) return;
+  const currentLead = (v4State.leads || []).find((lead) => String(lead.id) === String(leadId));
+  const nextDate = nextContactDate(kind);
+  const currentStatus = currentLead?.status || 'Новая';
+  const nextStatus = ['КП отправлено', 'Ждём ответ'].includes(currentStatus) ? currentStatus : 'Ждём ответ';
+  if (button) button.disabled = true;
+  try {
+    setStatus('Назначаю следующий контакт...', 'warn');
+    const response = await timeout(
+      supabaseClient
+        .from('leader_leads')
+        .update({ next_contact_at: nextDate.toISOString(), status: nextStatus, updated_at: new Date().toISOString() })
+        .eq('id', leadId)
+        .select(LEAD_FIELDS)
+        .single(),
+      16000,
+      'Следующий контакт не сохранился за 16 секунд'
+    );
+    if (response.error) throw response.error;
+    mergeLead(response.data);
+    render();
+    toast('Следующий контакт назначен');
+    setStatus('Следующий контакт назначен', 'good');
+  } catch (error) {
+    const message = friendlyError(error);
+    toast(message);
+    setStatus(`Ошибка контакта: ${message}`, 'error');
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 function ensureStyles() {
   if (document.getElementById('contactControlV1Styles')) return;
   const style = document.createElement('style');
@@ -52,7 +115,8 @@ function ensureStyles() {
     .v4-contact-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}.v4-contact-head h3{margin:0;font-size:17px}.v4-contact-badges{display:flex;gap:6px;flex-wrap:wrap}
     .v4-contact-badge{border:1px solid #cbd5e1;background:#f8fafc;color:#334155;border-radius:999px;padding:5px 8px;font-size:12px;font-weight:900}.v4-contact-badge.is-danger{background:#fee2e2;border-color:#fecaca;color:#991b1b}.v4-contact-badge.is-warn{background:#fef3c7;border-color:#fcd34d;color:#92400e}
     .v4-contact-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:7px;color:#475569}.v4-contact-actions{display:flex;gap:8px;flex-wrap:wrap}.v4-contact-actions button{border:1px solid #cbd5e1;background:#fff;border-radius:12px;padding:9px 12px;font-weight:900}.v4-contact-actions .v4-primary{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
-    @media(max-width:640px){.v4-contact-card{border-radius:14px;padding:12px}.v4-contact-actions button{width:100%}}
+    .v4-contact-quick{display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid #e2e8f0;padding-top:10px}.v4-contact-quick b{color:#334155}.v4-contact-quick button{border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:12px;padding:8px 10px;font-weight:900}
+    @media(max-width:640px){.v4-contact-card{border-radius:14px;padding:12px}.v4-contact-actions button,.v4-contact-quick button{width:100%}.v4-contact-quick{display:grid}}
   `;
   document.head.appendChild(style);
 }
@@ -117,6 +181,13 @@ function card({ lead, reasons }) {
       <span><b>Создана:</b> ${dateRu(lead.created_at)}</span>
     </div>
     ${lead.message ? `<p class="v4-lead-message">${esc(lead.message)}</p>` : ''}
+    <div class="v4-contact-quick">
+      <b>Назначить контакт:</b>
+      <button type="button" data-contact-quick="today17" data-contact-id="${esc(lead.id)}">Сегодня 17:00</button>
+      <button type="button" data-contact-quick="tomorrow" data-contact-id="${esc(lead.id)}">Завтра 10:00</button>
+      <button type="button" data-contact-quick="plus3d" data-contact-id="${esc(lead.id)}">Через 3 дня</button>
+      <button type="button" data-contact-quick="plus7d" data-contact-id="${esc(lead.id)}">Через неделю</button>
+    </div>
     <div class="v4-contact-actions">
       <button type="button" class="v4-primary" data-contact-open="${esc(lead.id)}">Открыть заявку</button>
       ${!lead.phone ? `<button type="button" data-contact-filter-no-phone>Показать все без телефона</button>` : ''}
@@ -175,6 +246,12 @@ function boot() {
       event.preventDefault();
       event.stopPropagation();
       showContactControl();
+      return;
+    }
+    const quick = event.target.closest?.('[data-contact-quick]');
+    if (quick) {
+      event.preventDefault();
+      saveQuickContact(quick.dataset.contactId, quick.dataset.contactQuick, quick);
       return;
     }
     const open = event.target.closest?.('[data-contact-open]');
