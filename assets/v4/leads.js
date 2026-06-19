@@ -18,6 +18,7 @@ const QUICK_FILTERS = [
 ];
 
 let leadsLoadPromise = null;
+let startupLoadTimer = null;
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
@@ -25,11 +26,7 @@ function esc(value) {
 
 function formatDate(value) {
   if (!value) return '—';
-  try {
-    return new Date(value).toLocaleString('ru-RU');
-  } catch (_) {
-    return String(value);
-  }
+  try { return new Date(value).toLocaleString('ru-RU'); } catch (_) { return String(value); }
 }
 
 function money(value) {
@@ -107,10 +104,7 @@ function renderStatusOptions() {
   const select = byId('leadStatusFilter');
   if (!select) return;
   const current = select.value || v4State.leadFilters.status || 'active';
-  const options = [
-    ...QUICK_FILTERS,
-    ...STATUSES.map((status) => [status, status])
-  ];
+  const options = [...QUICK_FILTERS, ...STATUSES.map((status) => [status, status])];
   select.innerHTML = options.map(([value, label]) => `<option value="${esc(value)}" ${value === current ? 'selected' : ''}>${esc(label)}</option>`).join('');
   select.value = current;
 }
@@ -135,21 +129,10 @@ function renderLeadCard(lead) {
   return `
     <article class="v4-lead-card" data-id="${esc(lead.id)}">
       <div class="v4-lead-main">
-        <div class="v4-lead-title-row">
-          <h3>${esc(lead.name || 'Без имени')}</h3>
-          <span class="v4-lead-status ${statusClass(lead.status || 'Новая')}">${esc(lead.status || 'Новая')}</span>
-        </div>
+        <div class="v4-lead-title-row"><h3>${esc(lead.name || 'Без имени')}</h3><span class="v4-lead-status ${statusClass(lead.status || 'Новая')}">${esc(lead.status || 'Новая')}</span></div>
         ${hints ? `<div class="v4-lead-inline-hints">${hints}</div>` : ''}
-        <div class="v4-lead-meta">
-          <span>${formatDate(lead.created_at)}</span>
-          <span>${esc(lead.source || 'Источник не указан')}</span>
-          <span>${esc(lead.service || 'Услуга не указана')}</span>
-        </div>
-        <div class="v4-lead-details">
-          <span><b>Телефон:</b> ${esc(lead.phone || '—')}</span>
-          <span><b>Город:</b> ${esc(lead.city || '—')}</span>
-          <span><b>Бюджет:</b> ${money(lead.budget || lead.estimated_amount)}</span>
-        </div>
+        <div class="v4-lead-meta"><span>${formatDate(lead.created_at)}</span><span>${esc(lead.source || 'Источник не указан')}</span><span>${esc(lead.service || 'Услуга не указана')}</span></div>
+        <div class="v4-lead-details"><span><b>Телефон:</b> ${esc(lead.phone || '—')}</span><span><b>Город:</b> ${esc(lead.city || '—')}</span><span><b>Бюджет:</b> ${money(lead.budget || lead.estimated_amount)}</span></div>
         ${noPhone ? '<div class="v4-lead-warning-note">Нужно дозаполнить контакт: проверьте сообщение, страницу заявки или другой способ связи.</div>' : ''}
         ${lead.message ? `<p class="v4-lead-message">${esc(lead.message)}</p>` : ''}
       </div>
@@ -159,8 +142,7 @@ function renderLeadCard(lead) {
         ${noPhone ? '<button type="button" data-action="clarify-contact">Уточнить контакт</button>' : ''}
         <button type="button" data-action="work">В работу</button>
       </div>
-    </article>
-  `;
+    </article>`;
 }
 
 function ensureLeadStatsExtras() {
@@ -193,11 +175,11 @@ export function renderLeads() {
     return;
   }
   if (v4State.leadsError) {
-    list.innerHTML = `<div class="v4-empty is-error">${esc(v4State.leadsError)}<div class="v4-form-actions" style="margin-top:12px"><button type="button" class="v4-primary" data-retry-leads>Повторить загрузку заявок</button></div></div>`;
+    list.innerHTML = `<div class="v4-empty">${esc(v4State.leadsError)}<div class="v4-form-actions" style="margin-top:12px"><button type="button" class="v4-primary" data-retry-leads>Повторить загрузку заявок</button></div></div>`;
     return;
   }
   if (!v4State.leadsLoaded) {
-    list.innerHTML = '<div class="v4-empty">После входа заявки загрузятся автоматически.</div>';
+    list.innerHTML = '<div class="v4-empty">Заявки загрузятся автоматически через пару секунд. Также можно нажать «Обновить заявки».</div>';
     return;
   }
   if (!v4State.leads.length) {
@@ -222,8 +204,8 @@ async function doLoadLeads({ silent = false } = {}) {
         .select(LEAD_FIELDS)
         .order('created_at', { ascending: false })
         .limit(50),
-      30000,
-      'Заявки не загрузились за 30 секунд'
+      silent ? 45000 : 60000,
+      silent ? 'Автоматическая загрузка заявок не успела ответить' : 'Заявки не загрузились за 60 секунд'
     );
     if (response.error) throw response.error;
     setState({ leads: response.data || [], leadsLoaded: true, leadsBusy: false, leadsError: null });
@@ -232,9 +214,12 @@ async function doLoadLeads({ silent = false } = {}) {
     return response.data || [];
   } catch (error) {
     const message = friendlyError(error);
-    setState({ leadsBusy: false, leadsError: message, leadsLoaded: false });
+    const safeMessage = silent
+      ? 'Автоматическая загрузка заявок не успела ответить. Нажмите «Повторить загрузку заявок» или «Обновить заявки». CRM при этом открыта.'
+      : `Заявки не загрузились: ${message}`;
+    setState({ leadsBusy: false, leadsError: safeMessage, leadsLoaded: false });
     renderLeads();
-    setStatus(`Ошибка загрузки заявок: ${message}`, 'error');
+    setStatus(silent ? 'CRM открыта. Заявки можно загрузить вручную.' : `Ошибка загрузки заявок: ${message}`, silent ? 'warn' : 'error');
     return [];
   } finally {
     leadsLoadPromise = null;
@@ -260,7 +245,7 @@ async function updateLeadStatus(id, status) {
       .eq('id', id)
       .select(LEAD_FIELDS)
       .single(),
-    20000,
+    25000,
     'Статус заявки не обновился вовремя'
   );
   if (response.error) throw response.error;
@@ -270,7 +255,10 @@ async function updateLeadStatus(id, status) {
 }
 
 function bindLeadEvents() {
-  byId('reloadLeadsBtn')?.addEventListener('click', () => loadLeads({ force: true }).then(() => toast('Заявки обновлены')));
+  byId('reloadLeadsBtn')?.addEventListener('click', async () => {
+    const result = await loadLeads({ force: true, silent: false });
+    toast(result.length ? 'Заявки обновлены' : 'Заявки не загрузились');
+  });
   byId('leadStatusFilter')?.addEventListener('change', (event) => {
     setLeadFilters({ status: event.target.value });
     renderLeads();
@@ -312,13 +300,20 @@ function bindLeadEvents() {
   });
 }
 
+function scheduleStartupLeadLoad() {
+  window.clearTimeout(startupLoadTimer);
+  startupLoadTimer = window.setTimeout(() => {
+    if (v4State.crmReady && !v4State.leadsLoaded && !v4State.leadsBusy) {
+      loadLeads({ silent: true });
+    }
+  }, 1800);
+}
+
 export function bootLeads() {
   bindLeadEvents();
   renderLeads();
-  document.addEventListener('leader-v4:crm-ready', () => loadLeads({ silent: true }));
-  if (v4State.crmReady && !v4State.leadsLoaded && !v4State.leadsBusy) {
-    loadLeads({ silent: true });
-  }
+  document.addEventListener('leader-v4:crm-ready', scheduleStartupLeadLoad);
+  if (v4State.crmReady && !v4State.leadsLoaded && !v4State.leadsBusy) scheduleStartupLeadLoad();
 }
 
 document.addEventListener('DOMContentLoaded', bootLeads);
