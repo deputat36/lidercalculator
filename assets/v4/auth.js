@@ -4,49 +4,16 @@ import { timeout, friendlyError, isNetworkError } from './api.js';
 import { setState, resetAuthState, v4State } from './state.js';
 import { bindAuthUi, readCredentials, renderProfile, setAuthBusy, setProfileNotice, setStatus, showLoggedIn, showLoggedOut, toast } from './ui.js';
 
-async function ensureProfileForUser(user) {
-  if (!user?.id) return null;
-  setProfileNotice('Проверяю профиль доступа...');
-  try {
-    const response = await timeout(
-      supabaseClient.rpc('leader_ensure_profile', { user_email: user.email || '' }, {
-        timeoutMs: Math.max(V4_CONFIG.timeouts.profileMs + 7000, 12000),
-        timeoutMessage: 'Профиль доступа не подготовился вовремя'
-      }),
-      Math.max(V4_CONFIG.timeouts.profileMs + 7500, 12500),
-      'Профиль доступа не подготовился вовремя'
-    );
-    if (response.error) throw response.error;
-    const profile = response.data || null;
-    if (profile && typeof profile === 'object') {
-      setState({ profile, profileLoaded: true });
-      renderProfile(profile);
-      setProfileNotice('');
-    }
-    return profile;
-  } catch (error) {
-    console.warn('CRM v4 profile bootstrap warning:', error);
-    if (!v4State.profileLoaded) {
-      setProfileNotice('Профиль доступа временно не удалось подготовить. CRM откроется, но часть данных может не загрузиться.');
-    }
-    return null;
-  }
-}
-
 async function loadProfileInBackground(user) {
   if (!user?.id) return;
   const hadProfile = Boolean(v4State.profileLoaded && v4State.profile);
-  if (!hadProfile) setProfileNotice('Профиль загружается в фоне...');
+  if (!hadProfile) setProfileNotice('Профиль доступа загружается в фоне. CRM уже открыта.');
   try {
-    const response = await timeout(
-      supabaseClient
-        .from('leader_user_profiles')
-        .select('user_id,email,role,is_active,full_name')
-        .eq('user_id', user.id)
-        .maybeSingle(),
-      Math.max(V4_CONFIG.timeouts.profileMs + 7000, 12000),
-      'Профиль загружается дольше обычного'
-    );
+    const response = await supabaseClient
+      .from('leader_user_profiles')
+      .select('user_id,email,role,is_active,full_name')
+      .eq('user_id', user.id)
+      .maybeSingle();
     if (response.error) throw response.error;
     if (response.data) {
       setState({ profile: response.data, profileLoaded: true });
@@ -54,18 +21,29 @@ async function loadProfileInBackground(user) {
       setProfileNotice('');
       return;
     }
+
+    const ensured = await supabaseClient.rpc('leader_ensure_profile', { user_email: user.email || '' }, {
+      timeoutMs: Math.max(V4_CONFIG.timeouts.profileMs + 7000, 12000),
+      timeoutMessage: 'Профиль доступа не подготовился вовремя'
+    });
+    if (ensured.error) throw ensured.error;
+    if (ensured.data && typeof ensured.data === 'object') {
+      setState({ profile: ensured.data, profileLoaded: true });
+      renderProfile(ensured.data);
+      setProfileNotice('');
+      return;
+    }
+
     if (!hadProfile) {
       setState({ profile: null, profileLoaded: false });
       renderProfile(null);
-      setProfileNotice('Профиль не найден, CRM открыта по активной сессии.');
+      setProfileNotice('Профиль доступа пока не найден. CRM открыта, данные можно загружать вручную.');
     }
   } catch (error) {
     console.warn('CRM v4 profile warning:', error);
     if (!hadProfile) {
       setState({ profile: null, profileLoaded: false });
       renderProfile(null);
-      setProfileNotice('Профиль временно не загрузился. Вход выполнен, CRM доступна.');
-    } else {
       setProfileNotice('');
     }
   }
@@ -76,6 +54,7 @@ function emitCrmReady() {
 }
 
 function openCrm(session, statusText = 'CRM готова') {
+  if (!session?.user) return;
   setState({
     session,
     user: session.user,
@@ -84,8 +63,8 @@ function openCrm(session, statusText = 'CRM готова') {
   });
   showLoggedIn(session.user);
   setStatus(statusText, 'good');
-  loadProfileInBackground(session.user);
   emitCrmReady();
+  window.setTimeout(() => loadProfileInBackground(session.user), 400);
 }
 
 export async function checkAuth() {
@@ -103,8 +82,6 @@ export async function checkAuth() {
       setStatus('Нужен вход', 'warn');
       return false;
     }
-    setStatus('Проверяю профиль доступа', 'warn');
-    await ensureProfileForUser(data.session.user);
     openCrm(data.session, 'CRM готова');
     return true;
   } catch (error) {
@@ -129,15 +106,12 @@ export async function login() {
   try {
     const { data, error } = await timeout(
       supabaseClient.auth.signInWithPassword({ email, password }),
-      20000,
-      'Вход не ответил за 20 секунд. Проверьте интернет и повторите.'
+      22000,
+      'Вход не ответил за 22 секунды. Проверьте интернет и повторите.'
     );
     if (error) throw error;
     if (!data.session?.user) throw new Error('Сессия не получена');
-    setStatus('Подготавливаю профиль доступа', 'warn');
-    await ensureProfileForUser(data.session.user);
-    setStatus('Вход выполнен', 'good');
-    openCrm(data.session, 'CRM готова');
+    openCrm(data.session, 'Вход выполнен. CRM открыта');
     toast('Вход выполнен');
   } catch (error) {
     resetAuthState();
@@ -155,13 +129,14 @@ export async function logout() {
   if (v4State.authBusy) return;
   setState({ authBusy: true });
   setAuthBusy(true);
-  setStatus('Проверяю вход', 'warn');
+  setStatus('Выход из CRM...', 'warn');
   try {
     await timeout(supabaseClient.auth.signOut(), 12000, 'Выход не ответил вовремя');
   } finally {
     resetAuthState();
     showLoggedOut();
     renderProfile(null);
+    setProfileNotice('');
     setStatus('Нужен вход', 'warn');
     setAuthBusy(false);
     setState({ authBusy: false });
