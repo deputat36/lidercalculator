@@ -90,11 +90,19 @@ function quickStatusButtons(lead) {
   }).join('');
 }
 
+function nextContactState(lead) {
+  if (!lead.next_contact_at) return { className: 'is-warn', text: 'Следующий контакт не назначен' };
+  const time = new Date(lead.next_contact_at).getTime();
+  if (Number.isFinite(time) && time < Date.now()) return { className: 'is-error', text: 'Следующий контакт просрочен' };
+  return { className: 'is-good', text: 'Следующий контакт назначен' };
+}
+
 function renderLeadDetails(lead) {
   const phone = phoneHref(lead.phone);
   const phoneForMax = normalizePhoneForCopy(lead.phone);
   const payloadHtml = payloadRows(lead.payload);
   const nextContactValue = formatInputDateTime(lead.next_contact_at);
+  const contactState = nextContactState(lead);
   return `
     <div class="v4-lead-card-view">
       <div class="v4-card-view-head">
@@ -119,14 +127,24 @@ function renderLeadDetails(lead) {
         <div class="v4-quick-actions" aria-label="Быстрая смена статуса">
           ${quickStatusButtons(lead)}
         </div>
-        <div class="v4-next-contact-row">
-          <label>Следующий контакт
-            <input id="leadNextContactInput" type="datetime-local" value="${esc(nextContactValue)}">
-          </label>
-          <button type="button" data-next-contact="save" class="v4-primary">Сохранить дату</button>
-          <button type="button" data-next-contact="plus1h">+1 час</button>
-          <button type="button" data-next-contact="tomorrow">Завтра 10:00</button>
-          <button type="button" data-next-contact="plus3d">Через 3 дня</button>
+        <div class="v4-next-contact-box">
+          <div class="v4-next-contact-head">
+            <div>
+              <h4>Следующий контакт</h4>
+              <p class="v4-next-contact-state ${contactState.className}">${esc(contactState.text)} · ${formatDate(lead.next_contact_at)}</p>
+            </div>
+            <button type="button" data-next-contact="clear">Очистить дату</button>
+          </div>
+          <div class="v4-next-contact-row">
+            <label>Дата и время
+              <input id="leadNextContactInput" type="datetime-local" value="${esc(nextContactValue)}">
+            </label>
+            <button type="button" data-next-contact="save" class="v4-primary">Сохранить дату</button>
+            <button type="button" data-next-contact="today17">Сегодня 17:00</button>
+            <button type="button" data-next-contact="tomorrow">Завтра 10:00</button>
+            <button type="button" data-next-contact="plus3d">Через 3 дня</button>
+            <button type="button" data-next-contact="plus7d">Через неделю</button>
+          </div>
         </div>
       </section>
 
@@ -252,8 +270,8 @@ async function updateCurrentLead(patch, successText) {
       .eq('id', leadId)
       .select(FULL_LEAD_FIELDS)
       .single(),
-    12000,
-    'Заявка не обновилась за 12 секунд'
+    16000,
+    'Заявка не обновилась за 16 секунд'
   );
   if (response.error) throw response.error;
   mergeLead(response.data);
@@ -264,6 +282,7 @@ async function updateCurrentLead(patch, successText) {
 
 function nextContactDate(kind) {
   const date = new Date();
+  if (kind === 'today17') date.setHours(17, 0, 0, 0);
   if (kind === 'plus1h') date.setHours(date.getHours() + 1);
   if (kind === 'tomorrow') {
     date.setDate(date.getDate() + 1);
@@ -273,11 +292,20 @@ function nextContactDate(kind) {
     date.setDate(date.getDate() + 3);
     date.setHours(10, 0, 0, 0);
   }
+  if (kind === 'plus7d') {
+    date.setDate(date.getDate() + 7);
+    date.setHours(10, 0, 0, 0);
+  }
   return date;
 }
 
 async function saveNextContact(kind) {
   const input = byId('leadNextContactInput');
+  if (kind === 'clear') {
+    await updateCurrentLead({ next_contact_at: null }, 'Дата следующего контакта очищена');
+    setStatus('Дата следующего контакта очищена', 'warn');
+    return;
+  }
   let value = input?.value || '';
   if (kind && kind !== 'save') {
     value = formatInputDateTime(nextContactDate(kind).toISOString());
@@ -288,7 +316,9 @@ async function saveNextContact(kind) {
     return;
   }
   const isoValue = new Date(value).toISOString();
-  await updateCurrentLead({ next_contact_at: isoValue, status: v4State.currentLead?.status || 'Ждём ответ' }, 'Следующий контакт сохранён');
+  const currentStatus = v4State.currentLead?.status || 'Новая';
+  const nextStatus = ['КП отправлено', 'Ждём ответ'].includes(currentStatus) ? currentStatus : 'Ждём ответ';
+  await updateCurrentLead({ next_contact_at: isoValue, status: nextStatus }, 'Следующий контакт сохранён');
   setStatus('Следующий контакт обновлён', 'good');
 }
 
@@ -307,8 +337,8 @@ export async function loadCurrentLead(id = v4State.route.leadId) {
         .select(FULL_LEAD_FIELDS)
         .eq('id', id)
         .single(),
-      14000,
-      'Карточка заявки не загрузилась за 14 секунд'
+      16000,
+      'Карточка заявки не загрузилась за 16 секунд'
     );
     if (response.error) throw response.error;
     if (!response.data) throw new Error('Заявка не найдена');
