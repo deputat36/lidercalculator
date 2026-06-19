@@ -3,6 +3,10 @@ import { friendlyError } from './api.js';
 import { v4State } from './state.js';
 import { setStatus, toast } from './ui.js';
 
+const ORDER_FIELDS = 'id,order_number,project_name,status,deadline,contractor_cost,client_total,layout_status,layout_link,data,production_priority,priority,production_comment,internal_comment,progress_percent';
+const ORDER_ITEM_FIELDS = 'id,name,unit,quantity,contractor_price,client_sum,comment,data,created_at';
+const PRODUCTION_JOB_FIELDS = 'id,order_id,title,production_status,layout_status,priority,deadline,contractor_cost,client_total,file_url,technical_task,internal_comment,created_at,updated_at';
+
 let busy = false;
 let booted = false;
 
@@ -35,12 +39,12 @@ function orderRows(order, orderItems = []) {
 }
 
 async function fetchBundle(orderId) {
-  const orderResponse = await supabaseClient.from('leader_orders').select('*').eq('id', orderId).single();
+  const orderResponse = await supabaseClient.from('leader_orders').select(ORDER_FIELDS).eq('id', orderId).single();
   if (orderResponse.error || !orderResponse.data) throw orderResponse.error || new Error('Заказ не найден');
   const order = orderResponse.data;
   const [itemsResponse, jobsResponse] = await Promise.all([
-    supabaseClient.from('leader_order_items').select('*').eq('order_id', orderId).order('created_at', { ascending: true }),
-    supabaseClient.from('leader_production_jobs').select('*').eq('order_id', orderId).order('created_at', { ascending: false }).limit(10)
+    supabaseClient.from('leader_order_items').select(ORDER_ITEM_FIELDS).eq('order_id', orderId).order('created_at', { ascending: true }).limit(120),
+    supabaseClient.from('leader_production_jobs').select(PRODUCTION_JOB_FIELDS).eq('order_id', orderId).order('created_at', { ascending: false }).limit(10)
   ]);
   if (itemsResponse.error) throw itemsResponse.error;
   if (jobsResponse.error) throw jobsResponse.error;
@@ -64,7 +68,8 @@ function patchFromOrder(order) {
 }
 
 async function replaceProductionItems(jobId, orderId, rows) {
-  await supabaseClient.from('leader_production_job_items').delete().eq('job_id', jobId);
+  const deleteResponse = await supabaseClient.from('leader_production_job_items').delete().eq('job_id', jobId);
+  if (deleteResponse.error) throw deleteResponse.error;
   if (!rows.length) return;
   const items = rows.map((row) => ({
     job_id: jobId,
@@ -78,7 +83,8 @@ async function replaceProductionItems(jobId, orderId, rows) {
     client_price: Number(row.client_price || 0),
     comment: row.comment || ''
   }));
-  await supabaseClient.from('leader_production_job_items').insert(items);
+  const insertResponse = await supabaseClient.from('leader_production_job_items').insert(items);
+  if (insertResponse.error) throw insertResponse.error;
 }
 
 async function createOrUpdateProductionJob(orderId) {
@@ -96,7 +102,7 @@ async function createOrUpdateProductionJob(orderId) {
         .from('leader_production_jobs')
         .update(patchFromOrder(order))
         .eq('id', existing.id)
-        .select('*')
+        .select(PRODUCTION_JOB_FIELDS)
         .single();
       if (response.error || !response.data) throw response.error || new Error('Производственное задание не обновлено');
       job = response.data;
@@ -117,7 +123,7 @@ async function createOrUpdateProductionJob(orderId) {
       const response = await supabaseClient
         .from('leader_production_jobs')
         .insert({ ...patchFromOrder(order), order_id: order.id, production_status: 'Не передано', created_by: v4State.user?.id || null })
-        .select('*')
+        .select(PRODUCTION_JOB_FIELDS)
         .single();
       if (response.error || !response.data) throw response.error || new Error('Производственное задание не создано');
       job = response.data;
