@@ -5,6 +5,7 @@ import { byId, setStatus, toast } from './ui.js';
 import { openLeadRoute } from './router.js';
 
 const LEAD_FIELDS = 'id,created_at,name,phone,source,service,message,status,lead_quality,estimated_amount,next_contact_at,page_url,budget,city,converted_order_id,converted_client_id';
+const LEAD_LIST_FIELDS = 'id,created_at,name,phone,source,service,message,status,next_contact_at,page_url,budget,estimated_amount,city';
 const CLOSED_STATUSES = ['Спам', 'Создан заказ', 'Отказ', 'Не отвечает', 'Дорого', 'Передумал'];
 const ACTIVE_HIDDEN_STATUSES = new Set(CLOSED_STATUSES);
 const ARCHIVE_STATUSES = new Set(CLOSED_STATUSES);
@@ -19,6 +20,8 @@ const QUICK_FILTERS = [
 
 let leadsLoadPromise = null;
 let startupLoadTimer = null;
+let silentRetryTimer = null;
+let silentRetryCount = 0;
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
@@ -179,7 +182,7 @@ export function renderLeads() {
     return;
   }
   if (!v4State.leadsLoaded) {
-    list.innerHTML = '<div class="v4-empty">Заявки загрузятся автоматически через пару секунд. Также можно нажать «Обновить заявки».</div>';
+    list.innerHTML = '<div class="v4-empty">Заявки загрузятся автоматически через несколько секунд. Также можно нажать «Обновить заявки».</div>';
     return;
   }
   if (!v4State.leads.length) {
@@ -193,33 +196,42 @@ export function renderLeads() {
   list.innerHTML = leads.map(renderLeadCard).join('');
 }
 
+function scheduleSilentRetry() {
+  if (silentRetryCount >= 2) return;
+  window.clearTimeout(silentRetryTimer);
+  silentRetryCount += 1;
+  silentRetryTimer = window.setTimeout(() => {
+    if (v4State.crmReady && !v4State.leadsLoaded && !v4State.leadsBusy) {
+      loadLeads({ silent: true, force: true });
+    }
+  }, 7000 * silentRetryCount);
+}
+
 async function doLoadLeads({ silent = false } = {}) {
   setState({ leadsBusy: true, leadsError: null });
   renderLeads();
   try {
     if (!silent) setStatus('Загружаю заявки...', 'warn');
-    const response = await timeout(
-      supabaseClient
-        .from('leader_leads')
-        .select(LEAD_FIELDS)
-        .order('created_at', { ascending: false })
-        .limit(50),
-      silent ? 45000 : 60000,
-      silent ? 'Автоматическая загрузка заявок не успела ответить' : 'Заявки не загрузились за 60 секунд'
-    );
+    const response = await supabaseClient
+      .from('leader_leads')
+      .select(LEAD_LIST_FIELDS)
+      .order('created_at', { ascending: false })
+      .limit(30);
     if (response.error) throw response.error;
+    silentRetryCount = 0;
     setState({ leads: response.data || [], leadsLoaded: true, leadsBusy: false, leadsError: null });
     renderLeads();
-    if (!silent) setStatus(`CRM готова. Заявок: ${(response.data || []).length}`, 'good');
+    setStatus(`CRM готова. Заявок: ${(response.data || []).length}`, 'good');
     return response.data || [];
   } catch (error) {
     const message = friendlyError(error);
     const safeMessage = silent
-      ? 'Автоматическая загрузка заявок не успела ответить. Нажмите «Повторить загрузку заявок» или «Обновить заявки». CRM при этом открыта.'
+      ? 'Заявки пока не загрузились автоматически. CRM открыта — можно нажать «Повторить загрузку заявок» или дождаться повторной попытки.'
       : `Заявки не загрузились: ${message}`;
     setState({ leadsBusy: false, leadsError: safeMessage, leadsLoaded: false });
     renderLeads();
-    setStatus(silent ? 'CRM открыта. Заявки можно загрузить вручную.' : `Ошибка загрузки заявок: ${message}`, silent ? 'warn' : 'error');
+    setStatus(silent ? 'CRM открыта. Повторю загрузку заявок автоматически.' : `Ошибка загрузки заявок: ${message}`, silent ? 'warn' : 'error');
+    if (silent) scheduleSilentRetry();
     return [];
   } finally {
     leadsLoadPromise = null;
@@ -306,7 +318,7 @@ function scheduleStartupLeadLoad() {
     if (v4State.crmReady && !v4State.leadsLoaded && !v4State.leadsBusy) {
       loadLeads({ silent: true });
     }
-  }, 1800);
+  }, 4000);
 }
 
 export function bootLeads() {
