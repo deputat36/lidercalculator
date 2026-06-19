@@ -51,6 +51,8 @@ function badge() {
   if (!b) {
     b = document.createElement('span');
     b.className = 'v4-production-tab-badge';
+    b.textContent = '•';
+    b.title = 'Проверка производства запускается при открытии раздела';
     button.appendChild(b);
   }
   return b;
@@ -107,17 +109,12 @@ function insertAlertLine(counts) {
 
 async function fetchCounts() {
   const [productionResponse, installationResponse] = await Promise.all([
-    supabaseClient.from('leader_production_jobs').select('id,production_status,deadline').order('deadline', { ascending: true }).limit(250),
-    supabaseClient.from('leader_installation_jobs').select('id,install_status,scheduled_at').order('scheduled_at', { ascending: true }).limit(250)
+    supabaseClient.from('leader_production_jobs').select('id,production_status,deadline').order('deadline', { ascending: true }).limit(80),
+    supabaseClient.from('leader_installation_jobs').select('id,install_status,scheduled_at').order('scheduled_at', { ascending: true }).limit(80)
   ]);
   const production = productionResponse.error ? [] : productionResponse.data || [];
   const installation = installationResponse.error ? [] : installationResponse.data || [];
-  const counts = {
-    overdueProduction: 0,
-    overdueInstallation: 0,
-    todayProduction: 0,
-    todayInstallation: 0
-  };
+  const counts = { overdueProduction: 0, overdueInstallation: 0, todayProduction: 0, todayInstallation: 0 };
   production.forEach((job) => {
     const done = isDone(job.production_status, DONE_PRODUCTION);
     if (isOverdue(job.deadline, done)) counts.overdueProduction += 1;
@@ -149,15 +146,16 @@ async function refreshProductionAlerts(force = false) {
 
 function boot() {
   ensureStyles();
-  refreshProductionAlerts(true);
+  badge();
   document.addEventListener('leader-v4:tab-opened', (event) => {
-    if (event.detail?.tab === 'production') setTimeout(() => refreshProductionAlerts(true), 600);
+    if (event.detail?.tab === 'production') setTimeout(() => refreshProductionAlerts(true), 900);
   });
-  document.addEventListener('leader-v4-order-updated', () => setTimeout(() => refreshProductionAlerts(true), 800));
+  document.addEventListener('leader-v4-order-updated', () => {
+    if (document.body.dataset.v4Tab === 'production') setTimeout(() => refreshProductionAlerts(true), 900);
+  });
   document.addEventListener('click', (event) => {
-    if (event.target.closest?.('[data-v4-list-refresh="production"],[data-board-production-status],[data-board-install-status],[data-create-installation-from-order]')) {
-      setTimeout(() => refreshProductionAlerts(true), 900);
-    }
+    if (!event.target.closest?.('[data-v4-list-refresh="production"],[data-board-production-status],[data-board-install-status],[data-create-installation-from-order]')) return;
+    if (document.body.dataset.v4Tab === 'production') setTimeout(() => refreshProductionAlerts(true), 900);
   });
 }
 
