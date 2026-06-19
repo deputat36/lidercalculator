@@ -8,6 +8,7 @@ import './lead-action-autolog-v1.js?v=20260618-1';
 import './manager-workdesk-v1.js?v=20260618-1';
 import './order-control-v1.js?v=20260618-1';
 import './production-control-v1.js?v=20260618-1';
+import './finance-control-v1.js?v=20260618-1';
 
 let currentLeadId = null;
 
