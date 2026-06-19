@@ -4,6 +4,12 @@ import { friendlyError } from './api.js';
 import { v4State, setState } from './state.js';
 import { setStatus, toast } from './ui.js';
 
+const OFFER_FIELDS = 'id,lead_id,calculation_id,client_id,order_id,offer_number,offer_type,title,total_sum,status,created_at,updated_at';
+const CALC_FIELDS = 'id,lead_id,need_id,client_id,title,status,client_total,contractor_cost,profit,margin_percent,warning_level,public_comment,internal_comment,commercial_offer_id,order_id,created_at,updated_at';
+const ITEM_FIELDS = 'id,calculation_id,lead_id,catalog_id,category,item_type,name,unit,qty,contractor_price,contractor_sum,markup_percent,client_price,client_sum,profit,margin_percent,comment,data,sort_order';
+const LEAD_FIELDS = 'id,name,phone,source,status,converted_order_id,converted_client_id,converted_at,created_at,updated_at';
+const NEED_FIELDS = 'id,lead_id,client_id,need_type,title,description,structured_data,need_design,need_installation,deadline_date,status';
+
 let busy = false;
 let booted = false;
 let lastOfferId = '';
@@ -23,12 +29,8 @@ function orderTitleFromOffer(offer, calculation) {
   const raw = offer?.title || calculation?.title || 'Заказ РА Лидер';
   return raw.replace(/^КП:\s*/i, '').replace(/^Коммерческое предложение[:\s-]*/i, '').trim() || raw;
 }
-function host() {
-  return document.querySelector('#offerCardV1 .v4-offer-modal-card');
-}
-function currentOfferId() {
-  return document.querySelector('#offerCardV1 [data-edit-type="offer"][data-edit-id]')?.dataset.editId || '';
-}
+function host() { return document.querySelector('#offerCardV1 .v4-offer-modal-card'); }
+function currentOfferId() { return document.querySelector('#offerCardV1 [data-edit-type="offer"][data-edit-id]')?.dataset.editId || ''; }
 function ensureStyles() {
   if (document.getElementById('offerOrderCreateV1Styles')) return;
   const style = document.createElement('style');
@@ -44,13 +46,14 @@ function ensureStyles() {
 }
 
 async function loadBundle(offerId) {
-  const offerResponse = await supabaseClient.from('leader_commercial_offers').select('*').eq('id', offerId).single();
+  const offerResponse = await supabaseClient.from('leader_commercial_offers').select(OFFER_FIELDS).eq('id', offerId).single();
   if (offerResponse.error || !offerResponse.data) throw offerResponse.error || new Error('КП не найдено');
   const offer = offerResponse.data;
   if (offer.status !== 'Согласовано') return { offer, canCreate: false, reason: 'Заказ можно создать только из согласованного КП.' };
   if (offer.order_id) return { offer, canCreate: false, reason: 'По этому КП заказ уже создан.' };
+  if (!offer.calculation_id) return { offer, canCreate: false, reason: 'У КП нет связанного расчёта.' };
 
-  const calcResponse = await supabaseClient.from('leader_lead_calculations').select('*').eq('id', offer.calculation_id).single();
+  const calcResponse = await supabaseClient.from('leader_lead_calculations').select(CALC_FIELDS).eq('id', offer.calculation_id).single();
   if (calcResponse.error || !calcResponse.data) throw calcResponse.error || new Error('Связанный расчёт не найден');
   const calculation = calcResponse.data;
   if (calculation.order_id) return { offer, calculation, canCreate: false, reason: 'По связанному расчёту заказ уже создан.' };
@@ -58,21 +61,24 @@ async function loadBundle(offerId) {
 
   const itemsResponse = await supabaseClient
     .from('leader_lead_calculation_items')
-    .select('*')
+    .select(ITEM_FIELDS)
     .eq('calculation_id', calculation.id)
-    .order('sort_order', { ascending: true });
+    .order('sort_order', { ascending: true })
+    .limit(160);
   if (itemsResponse.error) throw itemsResponse.error;
   const items = itemsResponse.data || [];
   if (!items.length) return { offer, calculation, items, canCreate: false, reason: 'В связанном расчёте нет позиций.' };
 
-  const leadResponse = await supabaseClient.from('leader_leads').select('*').eq('id', calculation.lead_id || offer.lead_id).single();
+  const leadId = calculation.lead_id || offer.lead_id;
+  if (!leadId) return { offer, calculation, items, canCreate: false, reason: 'У КП нет связанной заявки.' };
+  const leadResponse = await supabaseClient.from('leader_leads').select(LEAD_FIELDS).eq('id', leadId).single();
   if (leadResponse.error || !leadResponse.data) throw leadResponse.error || new Error('Связанная заявка не найдена');
   const lead = leadResponse.data;
   if (lead.converted_order_id) return { offer, calculation, items, lead, canCreate: false, reason: 'По этой заявке заказ уже создан.' };
 
   let need = null;
   if (calculation.need_id) {
-    const needResponse = await supabaseClient.from('leader_lead_needs').select('*').eq('id', calculation.need_id).maybeSingle();
+    const needResponse = await supabaseClient.from('leader_lead_needs').select(NEED_FIELDS).eq('id', calculation.need_id).maybeSingle();
     if (needResponse.error) throw needResponse.error;
     need = needResponse.data || null;
   }
@@ -208,13 +214,7 @@ async function createOrderFromOffer(offerId) {
     const clientTotal = Number(bundle.calculation.client_total || 0);
     const contractorCost = Number(bundle.calculation.contractor_cost || 0);
     const prepayment = Math.max(0, Number(form.prepayment || 0));
-    const totals = {
-      cost: contractorCost,
-      total: clientTotal,
-      profit: Number(bundle.calculation.profit || clientTotal - contractorCost),
-      prepayment,
-      balance: Math.max(clientTotal - prepayment, 0)
-    };
+    const totals = { cost: contractorCost, total: clientTotal, profit: Number(bundle.calculation.profit || clientTotal - contractorCost), prepayment, balance: Math.max(clientTotal - prepayment, 0) };
 
     const result = await invokeLeaderFunction('leader-crm-leads', {
       action: 'create_order',
@@ -230,10 +230,7 @@ async function createOrderFromOffer(offerId) {
       payment_status: form.paymentStatus,
       rows,
       totals
-    }, {
-      timeoutMs: 25000,
-      timeoutMessage: 'Создание заказа не завершилось за 25 секунд'
-    });
+    }, { timeoutMs: 35000, timeoutMessage: 'Создание заказа не завершилось за 35 секунд' });
 
     if (!result.order?.id) throw new Error('CRM не вернула созданный заказ');
     const order = result.order;
@@ -281,9 +278,7 @@ function boot() {
       enhanceOfferCard(true);
     }
   }, true);
-  document.addEventListener('click', (event) => {
-    if (event.target.closest?.('[data-open-offer-card]')) setTimeout(() => enhanceOfferCard(true), 900);
-  });
+  document.addEventListener('click', (event) => { if (event.target.closest?.('[data-open-offer-card]')) setTimeout(() => enhanceOfferCard(true), 900); });
   document.addEventListener('leader-v4:lead-card-rendered', () => setTimeout(() => enhanceOfferCard(true), 500));
 }
 boot();
