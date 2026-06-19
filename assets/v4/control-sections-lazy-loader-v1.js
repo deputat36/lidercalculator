@@ -1,9 +1,9 @@
 const MODULES = {
   management_dashboard: { label: 'Дашборд', file: './management-dashboard-v2.js?v=20260619-safe-1', before: 'workdesk' },
   workdesk: { label: 'Рабочий стол', file: './manager-workdesk-v1.js?v=20260619-lazy-2', before: 'leads' },
-  order_control: { label: 'Контроль заказов', file: './order-control-v1.js?v=20260619-lazy-2', after: 'orders' },
-  finance_control: { label: 'Финансы', file: './finance-control-v1.js?v=20260619-lazy-2', after: 'order_control' },
-  production_control: { label: 'Контроль производства', file: './production-control-v1.js?v=20260619-lazy-2', after: 'production' }
+  order_control: { label: 'Контроль заказов', file: './order-control-v2.js?v=20260619-safe-1', after: 'orders' },
+  finance_control: { label: 'Финансы', file: './finance-control-v2.js?v=20260619-safe-1', after: 'order_control' },
+  production_control: { label: 'Контроль производства', file: './production-control-v2.js?v=20260619-safe-1', after: 'production' }
 };
 
 const loaded = new Set();
