@@ -91,7 +91,11 @@ function openCrm(session, statusText = 'CRM готова') {
 export async function checkAuth() {
   setStatus('Проверяю вход', 'warn');
   try {
-    const { data, error } = await supabaseClient.auth.getSession();
+    const { data, error } = await timeout(
+      supabaseClient.auth.getSession(),
+      12000,
+      'Проверка сессии не ответила вовремя'
+    );
     if (error) throw error;
     if (!data.session?.user) {
       resetAuthState();
@@ -123,7 +127,11 @@ export async function login() {
   setAuthBusy(true);
   setStatus('Проверяю вход', 'warn');
   try {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    const { data, error } = await timeout(
+      supabaseClient.auth.signInWithPassword({ email, password }),
+      20000,
+      'Вход не ответил за 20 секунд. Проверьте интернет и повторите.'
+    );
     if (error) throw error;
     if (!data.session?.user) throw new Error('Сессия не получена');
     setStatus('Подготавливаю профиль доступа', 'warn');
@@ -134,8 +142,9 @@ export async function login() {
   } catch (error) {
     resetAuthState();
     showLoggedOut();
-    setStatus(isNetworkError(error) ? 'Ошибка сети' : friendlyError(error), isNetworkError(error) ? 'error' : 'warn');
-    toast(friendlyError(error));
+    const message = isNetworkError(error) ? 'Ошибка сети или долгий ответ Supabase. Повторите вход.' : friendlyError(error);
+    setStatus(message, isNetworkError(error) ? 'error' : 'warn');
+    toast(message);
   } finally {
     setState({ authBusy: false });
     setAuthBusy(false);
@@ -148,13 +157,14 @@ export async function logout() {
   setAuthBusy(true);
   setStatus('Проверяю вход', 'warn');
   try {
-    await supabaseClient.auth.signOut();
+    await timeout(supabaseClient.auth.signOut(), 12000, 'Выход не ответил вовремя');
   } finally {
     resetAuthState();
     showLoggedOut();
     renderProfile(null);
     setStatus('Нужен вход', 'warn');
     setAuthBusy(false);
+    setState({ authBusy: false });
     toast('Вход сброшен');
   }
 }
