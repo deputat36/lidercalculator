@@ -1,10 +1,9 @@
 const MODULES = {
-  management_dashboard: { label: 'Дашборд', file: './management-dashboard-v1.js?v=20260619-lazy-1', before: 'workdesk' },
-  workdesk: { label: 'Рабочий стол', file: './manager-workdesk-v1.js?v=20260619-lazy-1', before: 'leads' },
-  contact_control: { label: 'Контроль контактов', file: './contact-control-v1.js?v=20260619-lazy-1', after: 'leads' },
-  order_control: { label: 'Контроль заказов', file: './order-control-v1.js?v=20260619-lazy-1', after: 'orders' },
-  finance_control: { label: 'Финансы', file: './finance-control-v1.js?v=20260619-lazy-1', after: 'order_control' },
-  production_control: { label: 'Контроль производства', file: './production-control-v1.js?v=20260619-lazy-1', after: 'production' }
+  management_dashboard: { label: 'Дашборд', file: './management-dashboard-v1.js?v=20260619-lazy-2', before: 'workdesk' },
+  workdesk: { label: 'Рабочий стол', file: './manager-workdesk-v1.js?v=20260619-lazy-2', before: 'leads' },
+  order_control: { label: 'Контроль заказов', file: './order-control-v1.js?v=20260619-lazy-2', after: 'orders' },
+  finance_control: { label: 'Финансы', file: './finance-control-v1.js?v=20260619-lazy-2', after: 'order_control' },
+  production_control: { label: 'Контроль производства', file: './production-control-v1.js?v=20260619-lazy-2', after: 'production' }
 };
 
 const loaded = new Set();
@@ -23,13 +22,8 @@ function ensureStyles() {
   document.head.appendChild(style);
 }
 
-function nav() {
-  return document.getElementById('v4LayoutTabs');
-}
-
-function tabButton(key) {
-  return nav()?.querySelector(`[data-v4-tab-button="${key}"]`) || null;
-}
+function nav() { return document.getElementById('v4LayoutTabs'); }
+function tabButton(key) { return nav()?.querySelector(`[data-v4-tab-button="${key}"]`) || null; }
 
 function insertButton(key, config) {
   const menu = nav();
@@ -39,7 +33,6 @@ function insertButton(key, config) {
   button.dataset.v4TabButton = key;
   button.dataset.lazyControlTab = '1';
   button.textContent = config.label;
-
   const before = config.before ? tabButton(config.before) : null;
   const after = config.after ? tabButton(config.after) : null;
   if (before) before.insertAdjacentElement('beforebegin', button);
@@ -63,11 +56,9 @@ function ensurePlaceholder(key, text = 'Раздел загружается...')
     section.id = `${key}LazySection`;
     section.className = 'v4-card v4-managed-section';
     section.dataset.v4ManagedSection = key;
-    section.innerHTML = `<div class="v4-lazy-section"><b>${esc(MODULES[key]?.label || 'Раздел')}</b><span>${esc(text)}</span><br><button type="button" data-lazy-retry="${esc(key)}">Повторить загрузку раздела</button></div>`;
     workspace().appendChild(section);
-  } else {
-    section.innerHTML = `<div class="v4-lazy-section"><b>${esc(MODULES[key]?.label || 'Раздел')}</b><span>${esc(text)}</span><br><button type="button" data-lazy-retry="${esc(key)}">Повторить загрузку раздела</button></div>`;
   }
+  section.innerHTML = `<div class="v4-lazy-section"><b>${esc(MODULES[key]?.label || 'Раздел')}</b><span>${esc(text)}</span><br><button type="button" data-lazy-retry="${esc(key)}">Повторить загрузку раздела</button></div>`;
   return section;
 }
 
@@ -80,10 +71,7 @@ function showOnly(key) {
 async function importWithTimeout(file, key) {
   const task = import(file);
   const timer = new Promise((_, reject) => window.setTimeout(() => reject(new Error('Модуль раздела не загрузился за 15 секунд')), 15000));
-  return Promise.race([task, timer]).catch((error) => {
-    loading.delete(key);
-    throw error;
-  });
+  return Promise.race([task, timer]).catch((error) => { loading.delete(key); throw error; });
 }
 
 async function loadAndOpen(key) {
@@ -91,14 +79,11 @@ async function loadAndOpen(key) {
   if (!config) return;
   ensureMenu();
   showOnly(key);
-
   if (loaded.has(key)) {
     window.setTimeout(() => tabButton(key)?.click(), 0);
     return;
   }
-
   if (loading.has(key)) return loading.get(key);
-
   ensurePlaceholder(key, 'Загружаю модуль раздела. Это происходит только при первом открытии вкладки.');
   showOnly(key);
   const promise = importWithTimeout(config.file, key)
@@ -134,7 +119,6 @@ function bind() {
       loadAndOpen(key);
       return;
     }
-
     const button = event.target.closest?.('[data-v4-tab-button]');
     const key = button?.dataset.v4TabButton;
     if (!key || !MODULES[key]) return;
@@ -143,7 +127,6 @@ function bind() {
     event.stopImmediatePropagation();
     loadAndOpen(key);
   }, true);
-
   document.addEventListener('leader-v4:crm-ready', scheduleMenu);
   document.addEventListener('leader-v4:tab-opened', scheduleMenu);
   document.addEventListener('DOMContentLoaded', scheduleMenu);
