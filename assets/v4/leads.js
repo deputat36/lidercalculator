@@ -156,6 +156,7 @@ function renderLeadCard(lead) {
       <div class="v4-lead-actions">
         ${phone ? `<a href="${esc(phone)}">Позвонить</a>` : ''}
         <button type="button" data-action="open">Открыть</button>
+        ${noPhone ? '<button type="button" data-action="clarify-contact">Уточнить контакт</button>' : ''}
         <button type="button" data-action="work">В работу</button>
       </div>
     </article>
@@ -296,11 +297,12 @@ function bindLeadEvents() {
       openLeadRoute(id);
       return;
     }
-    if (button.dataset.action === 'work') {
+    if (button.dataset.action === 'work' || button.dataset.action === 'clarify-contact') {
       button.disabled = true;
       try {
-        await updateLeadStatus(id, 'В работе');
-        toast('Заявка переведена в работу');
+        const nextStatus = button.dataset.action === 'clarify-contact' ? 'Уточнение деталей' : 'В работе';
+        await updateLeadStatus(id, nextStatus);
+        toast(button.dataset.action === 'clarify-contact' ? 'Заявка отправлена на уточнение контакта' : 'Заявка переведена в работу');
       } catch (error) {
         toast(friendlyError(error));
       } finally {
