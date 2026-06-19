@@ -3,6 +3,12 @@ import { friendlyError } from './api.js';
 import { v4State } from './state.js';
 import { setStatus, toast } from './ui.js';
 
+const ORDER_FIELDS = 'id,order_number,project_name,deadline,contractor_cost,client_total,layout_status,layout_link,data,production_priority,priority,production_comment,internal_comment,progress_percent,installation_address,client_name,client_phone';
+const ORDER_ITEM_FIELDS = 'id,name,unit,quantity,contractor_price,client_sum,comment,data,created_at';
+const PRODUCTION_JOB_FIELDS = 'id,order_id,title,production_status,created_at,updated_at';
+const PRODUCTION_ITEM_FIELDS = 'id,job_id,order_id,name,unit,qty,width,height,contractor_price,client_price,comment,created_at';
+const INSTALLATION_JOB_FIELDS = 'id,order_id,production_job_id,title,client_name,client_phone,install_status,priority,installer_name,installer_phone,address,scheduled_at,installer_cost,client_price,technical_task,tools_required,client_comment,installer_comment,internal_comment,before_photo_url,created_at,updated_at';
+
 let booted = false;
 let busy = false;
 
@@ -37,10 +43,7 @@ function ensureStyles() {
   document.head.appendChild(style);
 }
 
-function panel() {
-  return document.getElementById('orderProductionControlBox');
-}
-
+function panel() { return document.getElementById('orderProductionControlBox'); }
 function currentOrderId() {
   return panel()?.querySelector('[data-save-production-info]')?.dataset.saveProductionInfo
     || panel()?.querySelector('[data-create-production-job-safe]')?.dataset.createProductionJobSafe
@@ -48,19 +51,16 @@ function currentOrderId() {
     || window.LeaderV4CurrentOrderId
     || '';
 }
-
-function isOpenInstall(job) {
-  return !CLOSED_INSTALL_STATUSES.includes(job.install_status || '');
-}
+function isOpenInstall(job) { return !CLOSED_INSTALL_STATUSES.includes(job.install_status || ''); }
 
 async function fetchBundle(orderId) {
-  const orderResponse = await supabaseClient.from('leader_orders').select('*').eq('id', orderId).single();
+  const orderResponse = await supabaseClient.from('leader_orders').select(ORDER_FIELDS).eq('id', orderId).single();
   if (orderResponse.error || !orderResponse.data) throw orderResponse.error || new Error('Заказ не найден');
   const order = orderResponse.data;
   const [productionResponse, installResponse, orderItemsResponse] = await Promise.all([
-    supabaseClient.from('leader_production_jobs').select('*').eq('order_id', orderId).order('created_at', { ascending: false }).limit(10),
-    supabaseClient.from('leader_installation_jobs').select('*').eq('order_id', orderId).order('created_at', { ascending: false }).limit(20),
-    supabaseClient.from('leader_order_items').select('*').eq('order_id', orderId).order('created_at', { ascending: true })
+    supabaseClient.from('leader_production_jobs').select(PRODUCTION_JOB_FIELDS).eq('order_id', orderId).order('created_at', { ascending: false }).limit(10),
+    supabaseClient.from('leader_installation_jobs').select(INSTALLATION_JOB_FIELDS).eq('order_id', orderId).order('created_at', { ascending: false }).limit(20),
+    supabaseClient.from('leader_order_items').select(ORDER_ITEM_FIELDS).eq('order_id', orderId).order('created_at', { ascending: true }).limit(120)
   ]);
   if (productionResponse.error) throw productionResponse.error;
   if (installResponse.error) throw installResponse.error;
@@ -68,7 +68,7 @@ async function fetchBundle(orderId) {
   let sourceItems = orderItemsResponse.error ? [] : orderItemsResponse.data || [];
   let productionItems = [];
   if (productionJobs[0]?.id) {
-    const productionItemsResponse = await supabaseClient.from('leader_production_job_items').select('*').eq('job_id', productionJobs[0].id).order('created_at', { ascending: true });
+    const productionItemsResponse = await supabaseClient.from('leader_production_job_items').select(PRODUCTION_ITEM_FIELDS).eq('job_id', productionJobs[0].id).order('created_at', { ascending: true }).limit(160);
     if (!productionItemsResponse.error) productionItems = productionItemsResponse.data || [];
   }
   if (!sourceItems.length && productionItems.length) sourceItems = productionItems;
@@ -76,17 +76,9 @@ async function fetchBundle(orderId) {
   return { order, productionJobs, installs: installResponse.data || [], sourceItems };
 }
 
-function itemName(item) {
-  return item.name || item.title || 'Позиция монтажа';
-}
-
-function itemQty(item) {
-  return Number(item.qty || item.quantity || 1) || 1;
-}
-
-function firstOpenInstall(installs = []) {
-  return installs.find(isOpenInstall) || null;
-}
+function itemName(item) { return item.name || item.title || 'Позиция монтажа'; }
+function itemQty(item) { return Number(item.qty || item.quantity || 1) || 1; }
+function firstOpenInstall(installs = []) { return installs.find(isOpenInstall) || null; }
 
 function renderBox(orderId) {
   const root = panel();
@@ -126,10 +118,7 @@ async function enhance(force = false) {
   }
 }
 
-function formValue(id) {
-  return document.getElementById(id)?.value?.trim() || '';
-}
-
+function formValue(id) { return document.getElementById(id)?.value?.trim() || ''; }
 function buildJobPayload(order, productionJob, forceNew = false) {
   const scheduledRaw = formValue('orderInstallScheduled');
   const data = order.data && typeof order.data === 'object' ? order.data : {};
@@ -142,6 +131,8 @@ function buildJobPayload(order, productionJob, forceNew = false) {
     order_id: order.id,
     production_job_id: productionJob?.id || null,
     title: `Монтаж: ${order.project_name || `заказ №${order.order_number || String(order.id).slice(0, 8)}`}${forceNew ? ' — отдельный выезд' : ''}`,
+    client_name: order.client_name || null,
+    client_phone: order.client_phone || null,
     install_status: scheduledRaw ? 'Запланирован' : 'Нужно назначить',
     priority: order.priority || order.production_priority || 'Обычный',
     installer_name: installerName || null,
@@ -159,7 +150,8 @@ function buildJobPayload(order, productionJob, forceNew = false) {
 }
 
 async function replaceInstallItems(jobId, orderId, sourceItems = []) {
-  await supabaseClient.from('leader_installation_job_items').delete().eq('job_id', jobId);
+  const deleteResponse = await supabaseClient.from('leader_installation_job_items').delete().eq('job_id', jobId);
+  if (deleteResponse.error) throw deleteResponse.error;
   const rows = sourceItems.map((item) => ({
     job_id: jobId,
     order_id: orderId,
@@ -172,7 +164,10 @@ async function replaceInstallItems(jobId, orderId, sourceItems = []) {
     client_price: item.client_price || item.client_sum || 0,
     comment: item.comment || ''
   }));
-  if (rows.length) await supabaseClient.from('leader_installation_job_items').insert(rows);
+  if (rows.length) {
+    const insertResponse = await supabaseClient.from('leader_installation_job_items').insert(rows);
+    if (insertResponse.error) throw insertResponse.error;
+  }
 }
 
 async function upsertInstallation(orderId, forceNew = false) {
@@ -190,13 +185,13 @@ async function upsertInstallation(orderId, forceNew = false) {
     let oldStatus = null;
     if (openInstall) {
       oldStatus = openInstall.install_status || null;
-      const response = await supabaseClient.from('leader_installation_jobs').update(payload).eq('id', openInstall.id).select('*').single();
+      const response = await supabaseClient.from('leader_installation_jobs').update(payload).eq('id', openInstall.id).select(INSTALLATION_JOB_FIELDS).single();
       if (response.error || !response.data) throw response.error || new Error('Монтажное задание не обновлено');
       job = response.data;
       eventType = 'Обновлён монтаж';
       await replaceInstallItems(job.id, order.id, sourceItems);
     } else {
-      const response = await supabaseClient.from('leader_installation_jobs').insert({ ...payload, created_by: v4State.user?.id || null }).select('*').single();
+      const response = await supabaseClient.from('leader_installation_jobs').insert({ ...payload, created_by: v4State.user?.id || null }).select(INSTALLATION_JOB_FIELDS).single();
       if (response.error || !response.data) throw response.error || new Error('Монтажное задание не создано');
       job = response.data;
       eventType = forceNew ? 'Создан отдельный монтаж' : 'Создан монтаж';
