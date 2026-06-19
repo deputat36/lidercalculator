@@ -48,7 +48,7 @@ function showOnly(tab) {
 
 function loadProductionBoardV3() {
   if (productionBoardLoading) return productionBoardLoading;
-  productionBoardLoading = import('./production-board-v3.js?v=20260617-1')
+  productionBoardLoading = import('./production-board-v3.js?v=20260619-production-light-4')
     .then((module) => {
       if (document.body.dataset.v4Tab === 'production' && typeof module.loadProductionBoard === 'function') {
         return module.loadProductionBoard(false);
@@ -127,7 +127,7 @@ function scheduleSheetEnhance() {
   setTimeout(enhanceSheetPrintOption, 250);
 }
 
-// Важно: обычные вкладки теперь ведёт responsive-ui.js.
+// Важно: обычные вкладки ведёт responsive-ui-v2.js.
 // Этот модуль перехватывает только «Производство», чтобы не было двойного управления вкладками и падений загрузки разделов.
 document.addEventListener('click', (event) => {
   const button = event.target.closest?.('[data-v4-tab-button="production"]');
