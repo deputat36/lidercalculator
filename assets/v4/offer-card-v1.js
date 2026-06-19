@@ -20,13 +20,6 @@ function dateTimeRu(value) {
   if (!value) return '—';
   try { return new Date(value).toLocaleString('ru-RU'); } catch (_) { return String(value); }
 }
-function statusClass(status = '') {
-  const text = String(status).toLowerCase();
-  if (text.includes('соглас') || text.includes('готов') || text.includes('создан') || text.includes('выдан') || text.includes('закры')) return 'is-good';
-  if (text.includes('отказ') || text.includes('спам') || text.includes('отмен') || text.includes('проблем')) return 'is-danger';
-  if (text.includes('жд') || text.includes('уточ') || text.includes('работ') || text.includes('отправ') || text.includes('производ')) return 'is-warn';
-  return '';
-}
 function shortId(id) { return String(id || '').slice(0, 8); }
 
 function ensureStyles() {
@@ -41,7 +34,6 @@ function ensureStyles() {
     .v4-offer-columns{display:grid;grid-template-columns:1.15fr .85fr;gap:12px;margin-top:12px}.v4-offer-section{border:1px solid #e2e8f0;border-radius:18px;padding:14px;background:#fff}.v4-offer-section h3{margin:0 0 10px}
     .v4-offer-text{white-space:pre-wrap;border:1px solid #e2e8f0;background:#f8fafc;border-radius:14px;padding:12px;max-height:420px;overflow:auto;font-family:Arial,sans-serif;line-height:1.45}.v4-offer-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.v4-offer-tabs button.is-active{background:#ea580c;color:#fff;border-color:#ea580c}
     .v4-offer-row{border:1px solid #e2e8f0;border-radius:14px;padding:10px;margin:8px 0;background:#f8fafc}.v4-offer-row-head{display:flex;justify-content:space-between;gap:10px}.v4-offer-row-head b{overflow-wrap:anywhere}
-    .v4-offer-badge{display:inline-flex;border-radius:999px;background:#ffedd5;color:#9a3412;padding:4px 8px;font-size:12px;font-weight:900;white-space:nowrap}.v4-offer-badge.is-good{background:#dcfce7;color:#166534}.v4-offer-badge.is-warn{background:#fef3c7;color:#92400e}.v4-offer-badge.is-danger{background:#fee2e2;color:#991b1b}
     .v4-offer-actions-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.v4-offer-empty{border:1px dashed #cbd5e1;border-radius:14px;padding:12px;color:#64748b;background:#f8fafc}.v4-offer-close{white-space:nowrap}
     @media(max-width:860px){.v4-offer-modal-card{padding:12px;border-radius:18px}.v4-offer-head,.v4-offer-columns{display:grid;grid-template-columns:1fr}.v4-offer-actions-line button,.v4-offer-tabs button{width:100%}}
   `;
@@ -97,7 +89,7 @@ async function fetchOrder(orderId) {
   return response.error ? null : response.data;
 }
 async function fetchEvents(offerId) {
-  const response = await supabaseClient.from('leader_commercial_offer_events').select('id,event_type,old_status,new_status,comment,created_by_email,created_at').eq('offer_id', offerId).order('created_at', { ascending: false }).limit(30);
+  const response = await supabaseClient.from('leader_commercial_offer_events').select('id,event_type,old_status,new_status,comment,created_by_email,created_at').eq('offer_id', offerId).order('created_at', { ascending: false }).limit(20);
   return response.error ? [] : response.data || [];
 }
 
@@ -135,18 +127,28 @@ async function openOfferCard(offerId) {
   }
 }
 
-async function addButtonsInOffersList() {
+function offerIdFromCard(card) {
+  return card?.querySelector('[data-open-offer-card]')?.dataset.openOfferCard
+    || card?.querySelector('[data-edit-type="offer"][data-edit-id]')?.dataset.editId
+    || card?.dataset.offerId
+    || '';
+}
+
+function addButtonsInOffersList() {
   const list = document.getElementById('offersListSectionContent');
-  if (!list || list.dataset.offerCardReady) return;
-  const response = await supabaseClient.from('leader_commercial_offers').select('id').order('created_at', { ascending: false }).limit(100);
-  const rows = response.data || [];
-  [...list.querySelectorAll('.v4-crm-list-card')].forEach((card, index) => {
-    let actions = card.querySelector('.v4-crm-actions');
-    if (!actions) { actions = document.createElement('div'); actions.className = 'v4-crm-actions'; card.appendChild(actions); }
-    const id = rows[index]?.id;
-    if (id && !actions.querySelector('[data-open-offer-card]')) actions.insertAdjacentHTML('afterbegin', `<button type="button" class="v4-primary" data-open-offer-card="${esc(id)}">Открыть КП</button>`);
+  if (!list) return;
+  [...list.querySelectorAll('.v4-crm-list-card,.v4-offers-fast-card')].forEach((card) => {
+    let actions = card.querySelector('.v4-crm-actions,.v4-offers-fast-actions');
+    if (!actions) {
+      actions = document.createElement('div');
+      actions.className = 'v4-crm-actions';
+      card.appendChild(actions);
+    }
+    const id = offerIdFromCard(card);
+    if (id && !actions.querySelector('[data-open-offer-card]')) {
+      actions.insertAdjacentHTML('afterbegin', `<button type="button" class="v4-primary" data-open-offer-card="${esc(id)}">Открыть КП</button>`);
+    }
   });
-  list.dataset.offerCardReady = '1';
 }
 function addButtonsInLeadCard() {
   document.querySelectorAll('#offersBox .v4-offer-card[data-id]').forEach((card) => {
@@ -162,17 +164,13 @@ function addButtonsInClientCard() {
     if (actions && id && !actions.querySelector('[data-open-offer-card]')) actions.insertAdjacentHTML('afterbegin', `<button type="button" data-open-offer-card="${esc(id)}">Открыть КП</button>`);
   });
 }
-function resetListMark() {
-  const list = document.getElementById('offersListSectionContent');
-  if (list) delete list.dataset.offerCardReady;
-}
-async function enhance(force = false) {
+function enhance(force = false) {
   const now = Date.now();
   if (!force && now - lastEnhanceAt < 900) return;
   lastEnhanceAt = now;
   addButtonsInLeadCard();
   addButtonsInClientCard();
-  await addButtonsInOffersList().catch(() => {});
+  addButtonsInOffersList();
 }
 function copyOfferText(kind) {
   const text = document.querySelector('.v4-offer-text');
@@ -211,7 +209,7 @@ function boot() {
   document.addEventListener('leader-v4:lead-card-rendered', () => enhance(true));
   document.addEventListener('leader-v4:route-change', () => setTimeout(() => enhance(true), 300));
   document.addEventListener('click', (event) => {
-    if (event.target.closest?.('[data-v4-list-refresh="offers"],[data-v4-tab-button="offers"]')) setTimeout(() => { resetListMark(); enhance(true); }, 800);
+    if (event.target.closest?.('[data-v4-list-refresh="offers"],[data-v4-tab-button="offers"]')) setTimeout(() => enhance(true), 800);
     if (event.target.closest?.('[data-open-client-card]')) setTimeout(() => enhance(true), 900);
   });
   enhance(true);
