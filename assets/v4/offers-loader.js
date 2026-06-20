@@ -1,5 +1,5 @@
-import './offers.js?v=20260616-3';
-import './orders.js?v=20260616-3';
+import './offers.js?v=20260620-explicit-1';
+import './orders.js?v=20260620-explicit-1';
 
 const styles = [
   ['leader-v4-offers-css', 'assets/v4/offers.css?v=20260528-1'],
