@@ -35,7 +35,7 @@ function row(label, result, hint = '') {
 
 async function read(table, columns = 'id,created_at') {
   try {
-    const response = await supabaseClient.from(table).select(columns).limit(200);
+    const response = await supabaseClient.from(table).select(columns).limit(40);
     return response;
   } catch (error) {
     return { data: [], error };
@@ -57,7 +57,7 @@ function renderResults(results) {
   const host = document.getElementById('productionDiagnosticsBox');
   if (!host) return;
   const m = metrics(results);
-  host.innerHTML = `<h3>Диагностика производства</h3><p>Проверка чтения основных таблиц и быстрых показателей для текущего пользователя.</p><div class="v4-production-diagnostics-grid">${row('Заказы', results.orders, 'leader_orders')}${row('Позиции заказов', results.orderItems, 'leader_order_items')}${row('Производственные задания', results.production, `Просрочено: ${m.prodOverdue}, сегодня: ${m.prodToday}`)}${row('Позиции производства', results.productionItems, 'leader_production_job_items')}${row('Монтажные задания', results.installation, `Просрочено: ${m.installOverdue}, сегодня: ${m.installToday}`)}${row('Позиции монтажа', results.installationItems, 'leader_installation_job_items')}${row('События производства', results.productionEvents, 'не критично для сохранения')}${row('События монтажа', results.installationEvents, 'не критично для сохранения')}</div><div class="v4-production-diagnostics-actions"><button type="button" class="v4-primary" data-run-production-diagnostics>Проверить ещё раз</button><button type="button" data-close-production-diagnostics>Скрыть диагностику</button></div><p style="margin-top:10px;color:#475569">Последняя проверка: ${dt(new Date())}</p>`;
+  host.innerHTML = `<h3>Диагностика производства</h3><p>Проверка чтения основных таблиц и быстрых показателей для текущего пользователя. Для скорости берём до 40 последних строк на таблицу.</p><div class="v4-production-diagnostics-grid">${row('Заказы', results.orders, 'leader_orders')}${row('Позиции заказов', results.orderItems, 'leader_order_items')}${row('Производственные задания', results.production, `Просрочено: ${m.prodOverdue}, сегодня: ${m.prodToday}`)}${row('Позиции производства', results.productionItems, 'leader_production_job_items')}${row('Монтажные задания', results.installation, `Просрочено: ${m.installOverdue}, сегодня: ${m.installToday}`)}${row('Позиции монтажа', results.installationItems, 'leader_installation_job_items')}${row('События производства', results.productionEvents, 'не критично для сохранения')}${row('События монтажа', results.installationEvents, 'не критично для сохранения')}</div><div class="v4-production-diagnostics-actions"><button type="button" class="v4-primary" data-run-production-diagnostics>Проверить ещё раз</button><button type="button" data-close-production-diagnostics>Скрыть диагностику</button></div><p style="margin-top:10px;color:#475569">Последняя проверка: ${dt(new Date())}</p>`;
 }
 
 function ensureBox() {
