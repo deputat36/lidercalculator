@@ -4,7 +4,6 @@ import { v4State, setState } from './state.js';
 import { byId, setStatus, toast } from './ui.js';
 
 const CALC_FIELDS = 'id,lead_id,need_id,client_id,title,status,version_number,client_total,contractor_cost,profit,margin_percent,warning_level,warnings,public_comment,internal_comment,commercial_offer_id,order_id,created_by,updated_by,created_at,updated_at';
-const ITEM_FIELDS = 'id,calculation_id,lead_id,catalog_id,category,item_type,name,unit,qty,contractor_price,contractor_sum,markup_percent,client_price,client_sum,profit,margin_percent,comment,data,sort_order,created_at,updated_at';
 
 let rows = [];
 let saving = false;
@@ -160,63 +159,37 @@ function currentItems() {
     if (a <= 0) return [];
     const cost = num(val('stdFilmMaterial')) || 550;
     result.push(item({ category: 'Плёнка', name: `Плёнка ${width}×${height} м · ${qty} шт`, unit: 'м²', qty: a, contractor: cost, comment: `Площадь ${a.toFixed(2)} м²`, data: { mode, width, height, pieces: qty } }));
-    if (checked('stdMountFilm')) result.push(item({ category: 'Плёнка', type: 'Материал', name: 'Монтажная плёнка', unit: 'м²', qty: a, contractor: num(val('stdMountFilmCost')) || 300, comment: `Площадь ${a.toFixed(2)} м²`, data: { mode: 'mount_film' } }));
-    if (checked('stdCutFilm')) result.push(item({ category: 'Плоттерная резка', type: 'Услуга', name: 'Плоттерная резка / выборка', unit: 'м²', qty: a, contractor: num(val('stdCutFilmCost')) || 250, comment: `Площадь ${a.toFixed(2)} м²`, data: { mode: 'film_cutting' } }));
+    if (checked('stdMountFilm')) result.push(item({ category: 'Плёнка', type: 'Услуга', name: 'Монтажная плёнка', unit: 'м²', qty: a, contractor: num(val('stdMountFilmCost')) || 300, data: { mode: 'mount_film' } }));
+    if (checked('stdCutFilm')) result.push(item({ category: 'Плёнка', type: 'Услуга', name: 'Плоттерная резка / выборка', unit: 'м²', qty: a, contractor: num(val('stdCutFilmCost')) || 250, data: { mode: 'cut_film' } }));
   }
   if (mode === 'sheet') {
     if (a <= 0) return [];
-    const cost = num(val('stdSheetMaterial')) || 1400;
-    result.push(item({ category: 'Листовые материалы', name: `Листовой материал ${width}×${height} м · ${qty} шт`, unit: 'м²', qty: a, contractor: cost, comment: `Площадь ${a.toFixed(2)} м²`, data: { mode, width, height, pieces: qty } }));
-    if (checked('stdSheetPrint')) {
-      result.push(item({
-        category: 'Плёнка',
-        name: `Печать на плёнке ${width}×${height} м · ${qty} шт`,
-        unit: 'м²',
-        qty: a,
-        contractor: num(val('stdSheetPrintFilm')) || 550,
-        comment: `Плёнка такого же размера, как листовой материал. Площадь ${a.toFixed(2)} м²`,
-        data: { mode: 'sheet_print_film', width, height, pieces: qty, same_size_as_sheet: true }
-      }));
-    }
-    if (checked('stdSheetLamination')) {
-      result.push(item({
-        category: 'Накатка',
-        type: 'Услуга',
-        name: `Накатка плёнки на лист ${width}×${height} м · ${qty} шт`,
-        unit: 'м²',
-        qty: a,
-        contractor: num(val('stdSheetLaminationCost')) || 250,
-        comment: `Накатка плёнки на листовой материал такого же размера. Площадь ${a.toFixed(2)} м²`,
-        data: { mode: 'sheet_film_lamination', width, height, pieces: qty, same_size_as_sheet: true }
-      }));
-    }
-    if (checked('stdSheetCut')) result.push(item({ category: 'Резка', type: 'Услуга', name: 'Резка листового материала', unit: 'шт', qty, contractor: num(val('stdSheetCutCost')) || 180, comment: `${qty} шт`, data: { mode: 'sheet_cut' } }));
+    const material = num(val('stdSheetMaterial')) || 1400;
+    result.push(item({ category: 'Листовые материалы', name: `Листовой материал ${width}×${height} м · ${qty} шт`, unit: 'м²', qty: a, contractor: material, comment: `Площадь ${a.toFixed(2)} м²`, data: { mode, width, height, pieces: qty } }));
+    if (checked('stdSheetPrint')) result.push(item({ category: 'Плёнка', name: 'Плёнка с печатью на лист', unit: 'м²', qty: a, contractor: num(val('stdSheetPrintFilm')) || 550, data: { mode: 'sheet_print_film' } }));
+    if (checked('stdSheetLamination')) result.push(item({ category: 'Листовые материалы', type: 'Услуга', name: 'Накатка плёнки на лист', unit: 'м²', qty: a, contractor: num(val('stdSheetLaminationCost')) || 250, data: { mode: 'sheet_lamination' } }));
+    if (checked('stdSheetCut')) result.push(item({ category: 'Листовые материалы', type: 'Услуга', name: 'Резка листового материала', unit: 'шт', qty, contractor: num(val('stdSheetCutCost')) || 180, data: { mode: 'sheet_cut' } }));
   }
   if (mode === 'service') {
-    result.push(item({ category: 'Услуга', type: 'Услуга', name: val('stdServiceName') || 'Услуга', unit: 'шт', qty: 1, contractor: num(val('stdServiceCost')), client: num(val('stdServiceClient')), comment: val('stdServiceComment'), data: { mode } }));
+    const cost = num(val('stdServiceCost'));
+    const client = num(val('stdServiceClient')) || autoClient(cost);
+    if (cost <= 0 && client <= 0) return [];
+    result.push(item({ category: 'Услуги', type: 'Услуга', name: val('stdServiceName') || 'Услуга', unit: 'шт', qty: 1, contractor: cost, client, comment: val('stdServiceComment'), data: { mode: 'service' } }));
   }
   return result;
 }
-
 function renderPreview() {
   const box = byId('stdCalcPreview');
   if (!box) return;
-  const preview = currentItems().map(calcItem);
-  if (!preview.length) { box.className = 'v4-calc-live is-warn'; box.innerHTML = '<em>Заполните параметры — позиции появятся здесь.</em>'; return; }
-  const client = preview.reduce((s, r) => s + r.client_sum, 0);
-  const contractor = preview.reduce((s, r) => s + r.contractor_sum, 0);
-  const profit = client - contractor;
-  const margin = client > 0 ? profit / client * 100 : 0;
-  box.className = `v4-calc-live ${profit < 0 ? 'is-error' : margin < 20 ? 'is-warn' : 'is-good'}`;
-  box.innerHTML = `<span><b>Позиций:</b> ${preview.length}</span><span><b>Клиенту:</b> ${money(client)}</span><span><b>Себестоимость:</b> ${money(contractor)}</span><span><b>Маржа:</b> ${Math.round(margin)}%</span><div class="v4-estimate-lines">${preview.map((r) => `<div><b>${esc(r.name)}</b><span>${Number(r.qty).toLocaleString('ru-RU')} ${esc(r.unit)} · ${money(r.client_sum)}</span></div>`).join('')}</div>`;
+  const current = currentItems().map(calcItem);
+  box.innerHTML = current.length ? current.map((x) => `<div><b>${esc(x.name)}</b><span>${money(x.client_sum)} клиенту · себ. ${money(x.contractor_sum)}</span></div>`).join('') : '<span>Заполните параметры, чтобы увидеть позиции.</span>';
 }
 function renderRows() {
   const body = byId('stdCalcRows');
   const totalBox = byId('stdCalcTotals');
   if (!body || !totalBox) return;
   const t = totals();
-  body.innerHTML = rows.length ? rows.map((r, index) => {
-    const row = calcItem(r, index);
+  body.innerHTML = t.items.length ? t.items.map((row, index) => {
     return `<tr><td>${esc(row.name)}${row.comment ? `<small>${esc(row.comment)}</small>` : ''}</td><td>${esc(row.category)}</td><td>${esc(row.unit)}</td><td>${Number(row.qty).toLocaleString('ru-RU')}</td><td>${money(row.contractor_price)}</td><td>${money(row.client_price)}</td><td>${money(row.client_sum)}</td><td><button type="button" data-std-remove="${index}">×</button></td></tr>`;
   }).join('') : '<tr><td colspan="8">Добавьте позицию.</td></tr>';
   totalBox.className = `v4-calc-totals ${t.profit < 0 ? 'is-error' : t.margin < 20 ? 'is-warn' : 'is-good'}`;
@@ -282,7 +255,7 @@ async function save() {
     if (calc.error) throw calc.error;
     created = calc.data.id;
     const payload = t.items.map((r, i) => ({ ...r, calculation_id: calc.data.id, lead_id: v4State.route.leadId, sort_order: i + 1 }));
-    const saved = await timeout(supabaseClient.from('leader_lead_calculation_items').insert(payload).select(ITEM_FIELDS), 14000, 'Позиции не сохранились за 14 секунд');
+    const saved = await timeout(supabaseClient.from('leader_lead_calculation_items').insert(payload), 14000, 'Позиции не сохранились за 14 секунд');
     if (saved.error) throw saved.error;
     setState({ calculations: [calc.data, ...(v4State.calculations || [])] });
     rows = [];
