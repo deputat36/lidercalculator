@@ -80,7 +80,12 @@ async function fetchCalculation(calculationId) {
 }
 async function fetchItems(calculationId) {
   if (!calculationId) return [];
-  const response = await supabaseClient.from('leader_lead_calculation_items').select('id,name,category,item_type,unit,qty,client_price,client_sum,comment,sort_order').eq('calculation_id', calculationId).order('sort_order', { ascending: true });
+  const response = await supabaseClient
+    .from('leader_lead_calculation_items')
+    .select('id,name,category,item_type,unit,qty,client_price,client_sum,comment,sort_order')
+    .eq('calculation_id', calculationId)
+    .order('sort_order', { ascending: true })
+    .limit(160);
   return response.error ? [] : response.data || [];
 }
 async function fetchOrder(orderId) {
@@ -138,80 +143,58 @@ function addButtonsInOffersList() {
   const list = document.getElementById('offersListSectionContent');
   if (!list) return;
   [...list.querySelectorAll('.v4-crm-list-card,.v4-offers-fast-card')].forEach((card) => {
-    let actions = card.querySelector('.v4-crm-actions,.v4-offers-fast-actions');
-    if (!actions) {
-      actions = document.createElement('div');
-      actions.className = 'v4-crm-actions';
-      card.appendChild(actions);
-    }
-    const id = offerIdFromCard(card);
-    if (id && !actions.querySelector('[data-open-offer-card]')) {
-      actions.insertAdjacentHTML('afterbegin', `<button type="button" class="v4-primary" data-open-offer-card="${esc(id)}">Открыть КП</button>`);
-    }
+    if (card.querySelector('[data-open-offer-card]')) return;
+    const offerId = offerIdFromCard(card);
+    if (!offerId) return;
+    const actions = card.querySelector('.v4-card-view-actions,.v4-crm-list-actions,.v4-offers-fast-actions') || card;
+    actions.insertAdjacentHTML('afterbegin', `<button type="button" data-open-offer-card="${esc(offerId)}">Карточка КП</button>`);
   });
-}
-function addButtonsInLeadCard() {
-  document.querySelectorAll('#offersBox .v4-offer-card[data-id]').forEach((card) => {
-    const actions = card.querySelector('.v4-offer-actions');
-    const id = card.dataset.id;
-    if (actions && id && !actions.querySelector('[data-open-offer-card]')) actions.insertAdjacentHTML('afterbegin', `<button type="button" class="v4-primary" data-open-offer-card="${esc(id)}">Открыть КП</button>`);
-  });
-}
-function addButtonsInClientCard() {
-  document.querySelectorAll('#clientCardV1 [data-edit-type="offer"][data-edit-id]').forEach((button) => {
-    const actions = button.closest('.v4-client-actions');
-    const id = button.dataset.editId;
-    if (actions && id && !actions.querySelector('[data-open-offer-card]')) actions.insertAdjacentHTML('afterbegin', `<button type="button" data-open-offer-card="${esc(id)}">Открыть КП</button>`);
-  });
-}
-function enhance(force = false) {
-  const now = Date.now();
-  if (!force && now - lastEnhanceAt < 900) return;
-  lastEnhanceAt = now;
-  addButtonsInLeadCard();
-  addButtonsInClientCard();
-  addButtonsInOffersList();
-}
-function copyOfferText(kind) {
-  const text = document.querySelector('.v4-offer-text');
-  const value = kind === 'short' ? text?.dataset.offerShort : text?.dataset.offerFull;
-  if (!value) return;
-  navigator.clipboard?.writeText(value);
-}
-function switchTextTab(tab) {
-  const text = document.querySelector('.v4-offer-text');
-  if (!text) return;
-  document.querySelectorAll('[data-offer-text-tab]').forEach((button) => button.classList.toggle('is-active', button.dataset.offerTextTab === tab));
-  text.textContent = tab === 'short' ? (text.dataset.offerShort || 'Короткое сообщение не заполнено.') : (text.dataset.offerFull || 'Полный текст КП не заполнен.');
 }
 
-function boot() {
+function addButtonsInLeadCard() {
+  document.querySelectorAll('#offersBox .v4-offer-card').forEach((card) => {
+    if (card.querySelector('[data-open-offer-card]')) return;
+    const offerId = offerIdFromCard(card);
+    if (!offerId) return;
+    const actions = card.querySelector('.v4-offer-actions') || card;
+    actions.insertAdjacentHTML('afterbegin', `<button type="button" data-open-offer-card="${esc(offerId)}">Карточка КП</button>`);
+  });
+}
+
+function enhance() {
+  const now = Date.now();
+  if (now - lastEnhanceAt < 450) return;
+  lastEnhanceAt = now;
+  addButtonsInOffersList();
+  addButtonsInLeadCard();
+}
+
+function bind() {
   if (booted) return;
   booted = true;
-  ensureStyles();
   document.addEventListener('click', (event) => {
-    const open = event.target.closest?.('[data-open-offer-card]');
-    if (open) {
-      event.preventDefault();
-      event.stopPropagation();
-      openOfferCard(open.dataset.openOfferCard);
-      return;
-    }
     const close = event.target.closest?.('[data-offer-card-close]');
-    if (close) closeCard();
+    if (close) { closeCard(); return; }
+    const open = event.target.closest?.('[data-open-offer-card]');
+    if (open) { event.preventDefault(); openOfferCard(open.dataset.openOfferCard); return; }
     const copy = event.target.closest?.('[data-offer-copy]');
-    if (copy) copyOfferText(copy.dataset.offerCopy);
+    if (copy) {
+      const text = document.querySelector('.v4-offer-text');
+      const value = copy.dataset.offerCopy === 'short' ? text?.dataset.offerShort : text?.dataset.offerFull;
+      if (value) navigator.clipboard?.writeText(value);
+    }
     const tab = event.target.closest?.('[data-offer-text-tab]');
-    if (tab) switchTextTab(tab.dataset.offerTextTab);
-  }, true);
-  document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeCard(); });
-  document.addEventListener('leader-v4:crm-ready', () => enhance(true));
-  document.addEventListener('leader-v4:lead-card-rendered', () => enhance(true));
-  document.addEventListener('leader-v4:route-change', () => setTimeout(() => enhance(true), 300));
-  document.addEventListener('click', (event) => {
-    if (event.target.closest?.('[data-v4-list-refresh="offers"],[data-v4-tab-button="offers"]')) setTimeout(() => enhance(true), 800);
-    if (event.target.closest?.('[data-open-client-card]')) setTimeout(() => enhance(true), 900);
+    if (tab) {
+      const box = document.querySelector('.v4-offer-text');
+      if (!box) return;
+      document.querySelectorAll('[data-offer-text-tab]').forEach((button) => button.classList.toggle('is-active', button === tab));
+      box.textContent = tab.dataset.offerTextTab === 'short' ? (box.dataset.offerShort || 'Короткий текст не заполнен.') : (box.dataset.offerFull || 'Полный текст КП не заполнен.');
+    }
   });
-  enhance(true);
+  document.addEventListener('leader-v4:lead-card-rendered', () => setTimeout(enhance, 250));
+  document.addEventListener('leader-v4:tab-opened', () => setTimeout(enhance, 250));
+  new MutationObserver(() => setTimeout(enhance, 80)).observe(document.body, { childList: true, subtree: true });
+  setInterval(enhance, 2000);
 }
-boot();
+
+bind();
