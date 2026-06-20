@@ -4,6 +4,13 @@ import { friendlyError } from './api.js';
 import { v4State, setState, subscribeState } from './state.js';
 import { byId, setStatus, toast } from './ui.js';
 
+const ORDER_FIELDS = 'id,order_number,project_name,status,deadline,client_name,client_phone,client_total,contractor_cost,profit,payment_status,layout_status,data,created_at,lead_id,client_id';
+const OFFER_FIELDS = 'id,lead_id,calculation_id,client_id,order_id,title,status,total_sum,valid_until,created_at';
+const CALC_FIELDS = 'id,lead_id,need_id,client_id,title,status,client_total,contractor_cost,profit,public_comment,order_id,created_at,updated_at';
+const ITEM_FIELDS = 'id,calculation_id,lead_id,catalog_id,category,item_type,name,unit,qty,contractor_price,contractor_sum,markup_percent,client_sum,comment,data,sort_order';
+const LEAD_FIELDS = 'id,name,phone,source,status,converted_order_id,converted_client_id,converted_at,created_at,updated_at';
+const NEED_FIELDS = 'id,description,deadline_date,deadline_text,need_design,need_installation,status';
+
 let orders = [];
 let ordersBusy = false;
 let ordersError = null;
@@ -14,25 +21,9 @@ let previousCalculations = null;
 function esc(value) {
   return String(value ?? '').replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
 }
-
-function money(value) {
-  return `${Math.round(Number(value || 0)).toLocaleString('ru-RU')} ₽`;
-}
-
-function formatDate(value) {
-  if (!value) return '—';
-  try {
-    return new Date(value).toLocaleDateString('ru-RU');
-  } catch (_) {
-    return String(value);
-  }
-}
-
-function defaultDeadline() {
-  const date = new Date();
-  date.setDate(date.getDate() + 3);
-  return date.toISOString().slice(0, 10);
-}
+function money(value) { return `${Math.round(Number(value || 0)).toLocaleString('ru-RU')} ₽`; }
+function formatDate(value) { if (!value) return '—'; try { return new Date(value).toLocaleDateString('ru-RU'); } catch (_) { return String(value); } }
+function defaultDeadline() { const date = new Date(); date.setDate(date.getDate() + 3); return date.toISOString().slice(0, 10); }
 
 function ensureHost() {
   if (byId('ordersBox')) return byId('ordersBox');
@@ -41,7 +32,6 @@ function ensureHost() {
   offersBox.insertAdjacentHTML('afterend', '<section id="ordersBox" class="v4-orders-host"><div class="v4-empty">Заказы загрузятся после открытия карточки.</div></section>');
   return byId('ordersBox');
 }
-
 function linkedOrderIds() {
   const ids = new Set();
   if (v4State.currentLead?.converted_order_id) ids.add(v4State.currentLead.converted_order_id);
@@ -49,7 +39,6 @@ function linkedOrderIds() {
   (v4State.calculations || []).forEach((calc) => { if (calc.order_id) ids.add(calc.order_id); });
   return [...ids];
 }
-
 function eligibleOffers() {
   return (v4State.offers || []).filter((offer) => {
     if (offer.status !== 'Согласовано' || offer.order_id) return false;
@@ -57,27 +46,18 @@ function eligibleOffers() {
     return calc && !calc.order_id && Number(calc.client_total || 0) > 0;
   });
 }
-
 function orderTitleFromOffer(offer) {
   if (!offer) return '';
   const rawTitle = offer.title || 'Заказ РА Лидер';
   return rawTitle.replace(/^КП:\s*/i, '').trim() || rawTitle;
 }
-
 function offerOptions(selectedId = '') {
   const offers = eligibleOffers();
   if (!offers.length) return '<option value="">Нет согласованного КП без заказа</option>';
   const selected = selectedId || (offers.length === 1 ? offers[0].id : '');
-  return [
-    offers.length === 1 ? '' : '<option value="">Выберите согласованное КП</option>',
-    ...offers.map((offer) => `<option value="${esc(offer.id)}" ${offer.id === selected ? 'selected' : ''}>${esc(offer.title || 'КП')} — ${money(offer.total_sum)}</option>`)
-  ].join('');
+  return [offers.length === 1 ? '' : '<option value="">Выберите согласованное КП</option>', ...offers.map((offer) => `<option value="${esc(offer.id)}" ${offer.id === selected ? 'selected' : ''}>${esc(offer.title || 'КП')} — ${money(offer.total_sum)}</option>`)].join('');
 }
-
-function layoutStatus(order) {
-  return order.layout_status || order.data?.layout_status || order.data?.layoutStatus || 'Макета нет';
-}
-
+function layoutStatus(order) { return order.layout_status || order.data?.layout_status || order.data?.layoutStatus || 'Макета нет'; }
 function isDeadlineOverdue(order) {
   if (!order.deadline) return false;
   const deadline = new Date(order.deadline);
@@ -85,7 +65,6 @@ function isDeadlineOverdue(order) {
   deadline.setHours(23, 59, 59, 999);
   return deadline < new Date() && !['Готово', 'Выдано', 'Закрыт', 'Отменён'].includes(order.status || '');
 }
-
 function orderChecklistItems(order) {
   const status = order.status || 'Новый';
   const pay = order.payment_status || 'Не оплачено';
@@ -107,123 +86,31 @@ function orderChecklistItems(order) {
     { title: 'Выдача клиенту', text: issued ? status : 'Не выдано', done: issued, warn: !issued }
   ];
 }
-
 function renderOrderChecklist(order) {
   const items = orderChecklistItems(order);
   const done = items.filter((item) => item.done).length;
   const percent = Math.round((done / items.length) * 100);
-  return `
-    <div class="v4-order-progress">
-      <div class="v4-order-progress-head">
-        <span>Готовность заказа</span>
-        <b>${percent}%</b>
-      </div>
-      <div class="v4-order-progress-bar"><span style="width:${percent}%"></span></div>
-      <div class="v4-order-checklist">
-        ${items.map((item) => {
-          const cls = item.done ? 'is-done' : item.danger ? 'is-danger' : item.warn ? 'is-warn' : '';
-          return `<div class="v4-order-check ${cls}"><b>${item.done ? '✓ ' : item.danger ? '! ' : '• '}${esc(item.title)}</b><span>${esc(item.text)}</span></div>`;
-        }).join('')}
-      </div>
-    </div>
-  `;
+  return `<div class="v4-order-progress"><div class="v4-order-progress-head"><span>Готовность заказа</span><b>${percent}%</b></div><div class="v4-order-progress-bar"><span style="width:${percent}%"></span></div><div class="v4-order-checklist">${items.map((item) => { const cls = item.done ? 'is-done' : item.danger ? 'is-danger' : item.warn ? 'is-warn' : ''; return `<div class="v4-order-check ${cls}"><b>${item.done ? '✓ ' : item.danger ? '! ' : '• '}${esc(item.title)}</b><span>${esc(item.text)}</span></div>`; }).join('')}</div></div>`;
 }
-
 function renderOrderCard(order) {
   const orderType = order.data?.order_type || order.order_type || '—';
-  return `
-    <article class="v4-order-card">
-      <div class="v4-order-title-row">
-        <h4>№${esc(order.order_number || String(order.id || '').slice(0, 8))} — ${esc(order.project_name || 'Заказ')}</h4>
-        <span>${esc(order.status || 'Новый')}</span>
-      </div>
-      <div class="v4-order-meta">
-        <span><b>Клиент:</b> ${esc(order.client_name || '—')}</span>
-        <span><b>Телефон:</b> ${esc(order.client_phone || '—')}</span>
-        <span><b>Тип:</b> ${esc(orderType)}</span>
-        <span><b>Срок:</b> ${formatDate(order.deadline)}</span>
-        <span><b>Макет:</b> ${esc(layoutStatus(order))}</span>
-      </div>
-      <div class="v4-order-kpi">
-        <div><span>Клиенту</span><b>${money(order.client_total)}</b></div>
-        <div><span>Себестоимость</span><b>${money(order.contractor_cost)}</b></div>
-        <div><span>Прибыль</span><b>${money(order.profit)}</b></div>
-        <div><span>Оплата</span><b>${esc(order.payment_status || 'Не оплачено')}</b></div>
-      </div>
-      ${renderOrderChecklist(order)}
-    </article>
-  `;
+  return `<article class="v4-order-card"><div class="v4-order-title-row"><h4>№${esc(order.order_number || String(order.id || '').slice(0, 8))} — ${esc(order.project_name || 'Заказ')}</h4><span>${esc(order.status || 'Новый')}</span></div><div class="v4-order-meta"><span><b>Клиент:</b> ${esc(order.client_name || '—')}</span><span><b>Телефон:</b> ${esc(order.client_phone || '—')}</span><span><b>Тип:</b> ${esc(orderType)}</span><span><b>Срок:</b> ${formatDate(order.deadline)}</span><span><b>Макет:</b> ${esc(layoutStatus(order))}</span></div><div class="v4-order-kpi"><div><span>Клиенту</span><b>${money(order.client_total)}</b></div><div><span>Себестоимость</span><b>${money(order.contractor_cost)}</b></div><div><span>Прибыль</span><b>${money(order.profit)}</b></div><div><span>Оплата</span><b>${esc(order.payment_status || 'Не оплачено')}</b></div></div>${renderOrderChecklist(order)}</article>`;
 }
-
 function renderCreateForm() {
   const offers = eligibleOffers();
   const firstOffer = offers[0] || null;
   const defaultTitle = orderTitleFromOffer(firstOffer);
-  if (v4State.currentLead?.converted_order_id) {
-    return '<div class="v4-empty">По этой заявке заказ уже создан. Повторное создание заблокировано.</div>';
-  }
-  if (!offers.length) {
-    return '<div class="v4-empty">Для создания заказа сначала согласуйте КП, связанное с сохранённым расчётом.</div>';
-  }
-  return `
-    <div class="v4-order-form">
-      <h4>Создать заказ из согласованного КП</h4>
-      <div class="v4-order-warning">Проверьте название, срок, статус макета и комментарий. После создания заказ будет связан с заявкой, расчётом и КП.</div>
-      <div class="v4-form-grid">
-        <label>Согласованное КП
-          <select id="orderOfferId">${offerOptions(firstOffer?.id || '')}</select>
-        </label>
-        <label>Название заказа
-          <input id="orderProjectName" value="${esc(defaultTitle)}" placeholder="Например: Баннер 3×2 для клиента">
-        </label>
-        <label>Тип заказа
-          <select id="orderType"><option>Смешанный</option><option>Изготовление</option><option>Услуга</option></select>
-        </label>
-        <label>Срок
-          <input id="orderDeadline" type="date" value="${defaultDeadline()}">
-        </label>
-        <label>Статус макета
-          <select id="orderLayoutStatus"><option>Макета нет</option><option>Нужен дизайн</option><option>Клиент прислал макет</option><option>В работе у дизайнера</option><option>На согласовании</option><option>Согласован</option></select>
-        </label>
-        <label class="wide">Комментарий к заказу
-          <textarea id="orderComment" rows="3" placeholder="Важные условия, доставка, монтаж, особенности производства"></textarea>
-        </label>
-      </div>
-      <div class="v4-form-actions">
-        <button id="createOrderV4Btn" type="button" class="v4-primary" ${createBusy ? 'disabled' : ''}>${createBusy ? 'Создаю заказ...' : 'Создать заказ'}</button>
-      </div>
-    </div>
-  `;
+  if (v4State.currentLead?.converted_order_id) return '<div class="v4-empty">По этой заявке заказ уже создан. Повторное создание заблокировано.</div>';
+  if (!offers.length) return '<div class="v4-empty">Для создания заказа сначала согласуйте КП, связанное с сохранённым расчётом.</div>';
+  return `<div class="v4-order-form"><h4>Создать заказ из согласованного КП</h4><div class="v4-order-warning">Проверьте название, срок, статус макета и комментарий. После создания заказ будет связан с заявкой, расчётом и КП.</div><div class="v4-form-grid"><label>Согласованное КП<select id="orderOfferId">${offerOptions(firstOffer?.id || '')}</select></label><label>Название заказа<input id="orderProjectName" value="${esc(defaultTitle)}" placeholder="Например: Баннер 3×2 для клиента"></label><label>Тип заказа<select id="orderType"><option>Смешанный</option><option>Изготовление</option><option>Услуга</option></select></label><label>Срок<input id="orderDeadline" type="date" value="${defaultDeadline()}"></label><label>Статус макета<select id="orderLayoutStatus"><option>Макета нет</option><option>Нужен дизайн</option><option>Клиент прислал макет</option><option>В работе у дизайнера</option><option>На согласовании</option><option>Согласован</option></select></label><label class="wide">Комментарий к заказу<textarea id="orderComment" rows="3" placeholder="Важные условия, доставка, монтаж, особенности производства"></textarea></label></div><div class="v4-form-actions"><button id="createOrderV4Btn" type="button" class="v4-primary" ${createBusy ? 'disabled' : ''}>${createBusy ? 'Создаю заказ...' : 'Создать заказ'}</button></div></div>`;
 }
-
 export function renderOrders() {
   const box = ensureHost();
   if (!box) return;
-  if (!v4State.route.leadId) {
-    box.innerHTML = '';
-    return;
-  }
-  if (ordersBusy) {
-    box.innerHTML = '<div class="v4-empty">Загружаю связанные заказы...</div>';
-    return;
-  }
-  box.innerHTML = `
-    <section class="v4-subcard v4-orders-section">
-      <div class="v4-subcard-head">
-        <div>
-          <h3>Заказ</h3>
-          <p>Заказ создаётся только из согласованного КП и сохранённого расчёта. После создания контролируйте макет, оплату, производство, срок и выдачу.</p>
-        </div>
-        <span class="v4-muted">Заказов: ${orders.length}</span>
-      </div>
-      <div class="v4-orders-list">
-        ${ordersError ? `<div class="v4-empty is-error">${esc(ordersError)}</div>` : orders.length ? orders.map(renderOrderCard).join('') : '<div class="v4-empty">Связанный заказ пока не создан.</div>'}
-      </div>
-      ${renderCreateForm()}
-    </section>
-  `;
+  if (!v4State.route.leadId) { box.innerHTML = ''; return; }
+  if (ordersBusy) { box.innerHTML = '<div class="v4-empty">Загружаю связанные заказы...</div>'; return; }
+  box.innerHTML = `<section class="v4-subcard v4-orders-section"><div class="v4-subcard-head"><div><h3>Заказ</h3><p>Заказ создаётся только из согласованного КП и сохранённого расчёта. После создания контролируйте макет, оплату, производство, срок и выдачу.</p></div><span class="v4-muted">Заказов: ${orders.length}</span></div><div class="v4-orders-list">${ordersError ? `<div class="v4-empty is-error">${esc(ordersError)}</div>` : orders.length ? orders.map(renderOrderCard).join('') : '<div class="v4-empty">Связанный заказ пока не создан.</div>'}</div>${renderCreateForm()}</section>`;
 }
-
 export async function loadOrders() {
   ensureHost();
   const ids = linkedOrderIds();
@@ -238,16 +125,16 @@ export async function loadOrders() {
   ordersError = null;
   renderOrders();
   try {
-    const rows = [];
-    for (const id of ids) {
-      const response = await supabaseClient.from('leader_orders').select('*').eq('id', id).maybeSingle();
-      if (response.error) throw response.error;
-      if (response.data) rows.push(response.data);
-    }
-    orders = rows;
+    const response = await supabaseClient
+      .from('leader_orders')
+      .select(ORDER_FIELDS)
+      .in('id', ids)
+      .limit(30);
+    if (response.error) throw response.error;
+    orders = response.data || [];
     ordersBusy = false;
     renderOrders();
-    return rows;
+    return orders;
   } catch (error) {
     orders = [];
     ordersBusy = false;
@@ -256,15 +143,14 @@ export async function loadOrders() {
     return [];
   }
 }
-
 async function loadOrderBundle(offerId) {
-  const offerResponse = await supabaseClient.from('leader_commercial_offers').select('*').eq('id', offerId).single();
+  const offerResponse = await supabaseClient.from('leader_commercial_offers').select(OFFER_FIELDS).eq('id', offerId).single();
   if (offerResponse.error) throw offerResponse.error;
   const offer = offerResponse.data;
   if (offer.status !== 'Согласовано') throw new Error('Заказ можно создать только из согласованного КП');
   if (offer.order_id) throw new Error('По этому КП заказ уже создан');
 
-  const calcResponse = await supabaseClient.from('leader_lead_calculations').select('*').eq('id', offer.calculation_id).single();
+  const calcResponse = await supabaseClient.from('leader_lead_calculations').select(CALC_FIELDS).eq('id', offer.calculation_id).single();
   if (calcResponse.error) throw calcResponse.error;
   const calculation = calcResponse.data;
   if (calculation.order_id) throw new Error('По этому расчёту заказ уже создан');
@@ -272,9 +158,10 @@ async function loadOrderBundle(offerId) {
 
   const itemsResponse = await supabaseClient
     .from('leader_lead_calculation_items')
-    .select('*')
+    .select(ITEM_FIELDS)
     .eq('calculation_id', calculation.id)
-    .order('sort_order', { ascending: true });
+    .order('sort_order', { ascending: true })
+    .limit(160);
   if (itemsResponse.error) throw itemsResponse.error;
   const items = itemsResponse.data || [];
   if (!items.length) throw new Error('В расчёте нет позиций');
@@ -283,7 +170,7 @@ async function loadOrderBundle(offerId) {
 
   let lead = v4State.currentLead;
   if (!lead || lead.id !== calculation.lead_id) {
-    const leadResponse = await supabaseClient.from('leader_leads').select('*').eq('id', calculation.lead_id).single();
+    const leadResponse = await supabaseClient.from('leader_leads').select(LEAD_FIELDS).eq('id', calculation.lead_id).single();
     if (leadResponse.error) throw leadResponse.error;
     lead = leadResponse.data;
   }
@@ -291,14 +178,13 @@ async function loadOrderBundle(offerId) {
 
   let need = null;
   if (calculation.need_id) {
-    const needResponse = await supabaseClient.from('leader_lead_needs').select('*').eq('id', calculation.need_id).maybeSingle();
+    const needResponse = await supabaseClient.from('leader_lead_needs').select(NEED_FIELDS).eq('id', calculation.need_id).maybeSingle();
     if (needResponse.error) throw needResponse.error;
     need = needResponse.data || null;
   }
 
   return { offer, calculation, items, lead, need };
 }
-
 function buildRows(items) {
   return items.map((item) => ({
     catalog_id: item.catalog_id || null,
@@ -318,7 +204,6 @@ function buildRows(items) {
     data: item.data || {}
   }));
 }
-
 async function updateLinks(bundle, order) {
   const now = new Date().toISOString();
   const responses = await Promise.all([
@@ -339,7 +224,6 @@ async function updateLinks(bundle, order) {
   ]);
   return responses.filter((response) => response?.error).map((response) => response.error);
 }
-
 function captureOrderForm() {
   const offers = eligibleOffers();
   return {
@@ -351,14 +235,10 @@ function captureOrderForm() {
     comment: byId('orderComment')?.value?.trim() || ''
   };
 }
-
 async function createOrder() {
   if (createBusy) return;
   const form = captureOrderForm();
-  if (!form.offerId) {
-    toast('Выберите согласованное КП');
-    return;
-  }
+  if (!form.offerId) { toast('Выберите согласованное КП'); return; }
   createBusy = true;
   renderOrders();
   try {
@@ -367,12 +247,7 @@ async function createOrder() {
     const projectName = form.projectName || orderTitleFromOffer(bundle.offer) || bundle.calculation.title || 'Заказ РА Лидер';
     const comment = form.comment || bundle.calculation.public_comment || bundle.need?.description || '';
     const rows = buildRows(bundle.items);
-    const totals = {
-      cost: Number(bundle.calculation.contractor_cost || 0),
-      total: Number(bundle.calculation.client_total || 0),
-      profit: Number(bundle.calculation.profit || 0),
-      balance: Number(bundle.calculation.client_total || 0)
-    };
+    const totals = { cost: Number(bundle.calculation.contractor_cost || 0), total: Number(bundle.calculation.client_total || 0), profit: Number(bundle.calculation.profit || 0), balance: Number(bundle.calculation.client_total || 0) };
 
     const result = await invokeLeaderFunction('leader-crm-leads', {
       action: 'create_order',
@@ -388,10 +263,7 @@ async function createOrder() {
       payment_status: 'Не оплачено',
       rows,
       totals
-    }, {
-      timeoutMs: 25000,
-      timeoutMessage: 'Создание заказа не завершилось за 25 секунд'
-    });
+    }, { timeoutMs: 25000, timeoutMessage: 'Создание заказа не завершилось за 25 секунд' });
 
     if (!result.order?.id) throw new Error('CRM не вернула созданный заказ');
     const order = result.order;
@@ -415,12 +287,10 @@ async function createOrder() {
     renderOrders();
   }
 }
-
 function bindOrderEvents() {
   byId('leadCardSection')?.addEventListener('click', async (event) => {
     if (event.target.closest('#createOrderV4Btn')) await createOrder();
   });
-
   byId('leadCardSection')?.addEventListener('change', (event) => {
     const select = event.target.closest('#orderOfferId');
     if (!select) return;
@@ -428,23 +298,9 @@ function bindOrderEvents() {
     const input = byId('orderProjectName');
     if (offer && input && !input.value.trim()) input.value = orderTitleFromOffer(offer);
   });
-
-  document.addEventListener('leader-v4:lead-card-rendered', () => {
-    ensureHost();
-    renderOrders();
-  });
-
-  document.addEventListener('leader-v4:route-change', (event) => {
-    orders = [];
-    ordersError = null;
-    if (event.detail?.leadId) loadOrders();
-    else renderOrders();
-  });
-
-  document.addEventListener('leader-v4:crm-ready', () => {
-    if (v4State.route.leadId) loadOrders();
-  });
-
+  document.addEventListener('leader-v4:lead-card-rendered', () => { ensureHost(); renderOrders(); });
+  document.addEventListener('leader-v4:route-change', (event) => { orders = []; ordersError = null; if (event.detail?.leadId) loadOrders(); else renderOrders(); });
+  document.addEventListener('leader-v4:crm-ready', () => { if (v4State.route.leadId) loadOrders(); });
   subscribeState((state) => {
     const offersChanged = state.offers !== previousOffers;
     const calculationsChanged = state.calculations !== previousCalculations;
@@ -457,7 +313,6 @@ function bindOrderEvents() {
     }
   });
 }
-
 export function bootOrders() {
   previousOffers = v4State.offers;
   previousCalculations = v4State.calculations;
