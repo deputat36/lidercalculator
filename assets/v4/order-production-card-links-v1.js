@@ -1,4 +1,4 @@
-import './production-diagnostics-v1.js?v=20260617-1';
+import './production-diagnostics-v1.js?v=20260620-limit-1';
 
 let booted = false;
 
