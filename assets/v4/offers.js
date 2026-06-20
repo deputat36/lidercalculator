@@ -3,6 +3,12 @@ import { timeout, friendlyError } from './api.js';
 import { v4State, setState, subscribeState } from './state.js';
 import { byId, setStatus, toast } from './ui.js';
 
+const OFFER_FIELDS = 'id,lead_id,calculation_id,client_id,order_id,offer_number,offer_type,title,short_text,full_text,total_sum,valid_until,status,sent_at,approved_at,rejected_at,created_by,updated_by,created_at,updated_at';
+const CALC_FIELDS = 'id,lead_id,need_id,client_id,title,status,version_number,client_total,contractor_cost,profit,margin_percent,warning_level,warnings,public_comment,internal_comment,commercial_offer_id,order_id,created_by,updated_by,created_at,updated_at';
+const ITEM_FIELDS = 'id,calculation_id,lead_id,catalog_id,category,item_type,name,unit,qty,contractor_price,contractor_sum,markup_percent,client_price,client_sum,profit,margin_percent,comment,data,sort_order,created_at,updated_at';
+const LEAD_FIELDS = 'id,name,phone,source,message,page_url,status,payload,created_at,updated_at,service,contact_preference,city,budget,utm_source,utm_medium,utm_campaign,utm_content,utm_term,assigned_to,converted_order_id,converted_client_id,last_contact_at,next_contact_at,converted_at,reject_reason,lead_quality,estimated_amount';
+const NEED_FIELDS = 'id,lead_id,title,need_type,description,structured_data,deadline_text,deadline_date,need_design,need_installation,status,created_at,updated_at';
+
 let activeOfferId = null;
 let createBusy = false;
 let previousCalculations = null;
@@ -17,11 +23,7 @@ function money(value) {
 
 function formatDate(value) {
   if (!value) return '—';
-  try {
-    return new Date(value).toLocaleDateString('ru-RU');
-  } catch (_) {
-    return String(value);
-  }
+  try { return new Date(value).toLocaleDateString('ru-RU'); } catch (_) { return String(value); }
 }
 
 function validUntilDefault() {
@@ -33,10 +35,7 @@ function validUntilDefault() {
 function calculationOptions(selected = '') {
   const calculations = v4State.calculations || [];
   if (!calculations.length) return '<option value="">Сначала сохраните расчёт</option>';
-  return [
-    '<option value="">Выберите расчёт</option>',
-    ...calculations.map((calc) => `<option value="${esc(calc.id)}" ${calc.id === selected ? 'selected' : ''}>${esc(calc.title || 'Расчёт')} — ${money(calc.client_total)}</option>`)
-  ].join('');
+  return ['<option value="">Выберите расчёт</option>', ...calculations.map((calc) => `<option value="${esc(calc.id)}" ${calc.id === selected ? 'selected' : ''}>${esc(calc.title || 'Расчёт')} — ${money(calc.client_total)}</option>`)].join('');
 }
 
 function needDescription(need) {
@@ -105,10 +104,7 @@ function buildOfferTexts({ calculation, items, lead, need, validUntil, extraComm
   fullLines.push('', `Срок действия предложения: до ${formatDate(validUntil)}.`);
   fullLines.push('Срок выполнения зависит от согласования макета, наличия материалов и загрузки производства.');
 
-  return {
-    shortText: shortLines.join('\n'),
-    fullText: fullLines.join('\n')
-  };
+  return { shortText: shortLines.join('\n'), fullText: fullLines.join('\n') };
 }
 
 function statusClass(status) {
@@ -141,7 +137,7 @@ async function updateLeadStatusFromOffer(leadId, status) {
       .from('leader_leads')
       .update({ status: leadStatus, updated_at: new Date().toISOString() })
       .eq('id', leadId)
-      .select('*')
+      .select(LEAD_FIELDS)
       .single(),
     12000,
     'Статус заявки не синхронизировался за 12 секунд'
@@ -153,96 +149,20 @@ async function updateLeadStatusFromOffer(leadId, status) {
 
 function renderOfferCard(offer) {
   const isActive = offer.id === activeOfferId;
-  return `
-    <article class="v4-offer-card" data-id="${esc(offer.id)}">
-      <div>
-        <div class="v4-offer-title-row">
-          <h4>${esc(offer.title || 'Коммерческое предложение')}</h4>
-          <span class="${statusClass(offer.status)}">${esc(offer.status || 'Черновик')}</span>
-        </div>
-        <div class="v4-offer-meta">
-          <span><b>Сумма:</b> ${money(offer.total_sum)}</span>
-          <span><b>Действует до:</b> ${formatDate(offer.valid_until)}</span>
-          <span><b>Создано:</b> ${formatDate(offer.created_at)}</span>
-        </div>
-      </div>
-      <div class="v4-offer-actions">
-        <button type="button" data-action="preview-offer">${isActive ? 'Скрыть' : 'Показать'}</button>
-        <button type="button" data-action="copy-short-offer">Копировать короткое</button>
-        <button type="button" data-action="copy-full-offer">Копировать полное</button>
-        ${offer.status !== 'КП отправлено' && offer.status !== 'Согласовано' ? '<button type="button" data-action="mark-offer-sent">КП отправлено</button>' : ''}
-        ${offer.status !== 'Согласовано' ? '<button type="button" data-action="approve-offer" class="v4-primary">Согласовано</button>' : ''}
-        ${offer.status !== 'Отклонено' && offer.status !== 'Согласовано' ? '<button type="button" data-action="reject-offer">Отклонено</button>' : ''}
-      </div>
-      ${isActive ? `
-        <div class="v4-offer-preview">
-          <div>
-            <h5>Подробное КП</h5>
-            <pre>${esc(offer.full_text || '')}</pre>
-          </div>
-          <div>
-            <h5>Короткое сообщение</h5>
-            <pre>${esc(offer.short_text || '')}</pre>
-          </div>
-        </div>
-      ` : ''}
-    </article>
-  `;
+  return `<article class="v4-offer-card" data-id="${esc(offer.id)}"><div><div class="v4-offer-title-row"><h4>${esc(offer.title || 'Коммерческое предложение')}</h4><span class="${statusClass(offer.status)}">${esc(offer.status || 'Черновик')}</span></div><div class="v4-offer-meta"><span><b>Сумма:</b> ${money(offer.total_sum)}</span><span><b>Действует до:</b> ${formatDate(offer.valid_until)}</span><span><b>Создано:</b> ${formatDate(offer.created_at)}</span></div></div><div class="v4-offer-actions"><button type="button" data-action="preview-offer">${isActive ? 'Скрыть' : 'Показать'}</button><button type="button" data-action="copy-short-offer">Копировать короткое</button><button type="button" data-action="copy-full-offer">Копировать полное</button>${offer.status !== 'КП отправлено' && offer.status !== 'Согласовано' ? '<button type="button" data-action="mark-offer-sent">КП отправлено</button>' : ''}${offer.status !== 'Согласовано' ? '<button type="button" data-action="approve-offer" class="v4-primary">Согласовано</button>' : ''}${offer.status !== 'Отклонено' && offer.status !== 'Согласовано' ? '<button type="button" data-action="reject-offer">Отклонено</button>' : ''}</div>${isActive ? `<div class="v4-offer-preview"><div><h5>Подробное КП</h5><pre>${esc(offer.full_text || '')}</pre></div><div><h5>Короткое сообщение</h5><pre>${esc(offer.short_text || '')}</pre></div></div>` : ''}</article>`;
 }
 
 function renderCreateForm() {
-  return `
-    <div class="v4-offer-form">
-      <h4>Сформировать КП из расчёта</h4>
-      <div class="v4-form-grid">
-        <label>Расчёт
-          <select id="offerCalculationId">${calculationOptions()}</select>
-        </label>
-        <label>Название КП
-          <input id="offerTitle" placeholder="Например: КП на изготовление баннера">
-        </label>
-        <label>Действует до
-          <input id="offerValidUntil" type="date" value="${validUntilDefault()}">
-        </label>
-        <label class="wide">Дополнительные условия для клиента
-          <textarea id="offerExtraComment" rows="2" placeholder="Предоплата, доставка, сроки, особенности монтажа"></textarea>
-        </label>
-      </div>
-      <div class="v4-form-actions">
-        <button id="createOfferBtn" type="button" class="v4-primary" ${v4State.calculations.length ? '' : 'disabled'}>Сформировать КП</button>
-      </div>
-      <p class="v4-muted">В клиентском тексте не показываются себестоимость, прибыль, маржа и цены подрядчиков.</p>
-    </div>
-  `;
+  return `<div class="v4-offer-form"><h4>Сформировать КП из расчёта</h4><div class="v4-form-grid"><label>Расчёт<select id="offerCalculationId">${calculationOptions()}</select></label><label>Название КП<input id="offerTitle" placeholder="Например: КП на изготовление баннера"></label><label>Действует до<input id="offerValidUntil" type="date" value="${validUntilDefault()}"></label><label class="wide">Дополнительные условия для клиента<textarea id="offerExtraComment" rows="2" placeholder="Предоплата, доставка, сроки, особенности монтажа"></textarea></label></div><div class="v4-form-actions"><button id="createOfferBtn" type="button" class="v4-primary" ${v4State.calculations.length ? '' : 'disabled'}>Сформировать КП</button></div><p class="v4-muted">В клиентском тексте не показываются себестоимость, прибыль, маржа и цены подрядчиков.</p></div>`;
 }
 
 export function renderOffers() {
   const box = byId('offersBox');
   if (!box) return;
-  if (!v4State.route.leadId) {
-    box.innerHTML = '';
-    return;
-  }
-  if (v4State.offersBusy) {
-    box.innerHTML = '<div class="v4-empty">Загружаю коммерческие предложения...</div>';
-    return;
-  }
+  if (!v4State.route.leadId) { box.innerHTML = ''; return; }
+  if (v4State.offersBusy) { box.innerHTML = '<div class="v4-empty">Загружаю коммерческие предложения...</div>'; return; }
   const offers = v4State.offers || [];
-  box.innerHTML = `
-    <section class="v4-subcard v4-offers-section">
-      <div class="v4-subcard-head">
-        <div>
-          <h3>Коммерческие предложения</h3>
-          <p>КП формируется только из сохранённого расчёта. При отправке, согласовании или отклонении статус заявки обновится автоматически.</p>
-        </div>
-        <span class="v4-muted">КП: ${offers.length}</span>
-      </div>
-      <div class="v4-offers-list">
-        ${v4State.offersError ? `<div class="v4-empty is-error">${esc(v4State.offersError)}</div>` : offers.length ? offers.map(renderOfferCard).join('') : '<div class="v4-empty">Коммерческих предложений пока нет.</div>'}
-      </div>
-      ${renderCreateForm()}
-    </section>
-  `;
+  box.innerHTML = `<section class="v4-subcard v4-offers-section"><div class="v4-subcard-head"><div><h3>Коммерческие предложения</h3><p>КП формируется только из сохранённого расчёта. При отправке, согласовании или отклонении статус заявки обновится автоматически.</p></div><span class="v4-muted">КП: ${offers.length}</span></div><div class="v4-offers-list">${v4State.offersError ? `<div class="v4-empty is-error">${esc(v4State.offersError)}</div>` : offers.length ? offers.map(renderOfferCard).join('') : '<div class="v4-empty">Коммерческих предложений пока нет.</div>'}</div>${renderCreateForm()}</section>`;
 }
 
 export async function loadOffers(leadId = v4State.route.leadId) {
@@ -257,9 +177,10 @@ export async function loadOffers(leadId = v4State.route.leadId) {
     const response = await timeout(
       supabaseClient
         .from('leader_commercial_offers')
-        .select('*')
+        .select(OFFER_FIELDS)
         .eq('lead_id', leadId)
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .limit(50),
       12000,
       'Коммерческие предложения не загрузились за 12 секунд'
     );
@@ -278,7 +199,7 @@ export async function loadOffers(leadId = v4State.route.leadId) {
 
 async function loadCalculationBundle(calculationId) {
   const calculationResponse = await timeout(
-    supabaseClient.from('leader_lead_calculations').select('*').eq('id', calculationId).single(),
+    supabaseClient.from('leader_lead_calculations').select(CALC_FIELDS).eq('id', calculationId).single(),
     12000,
     'Расчёт не загрузился за 12 секунд'
   );
@@ -288,9 +209,10 @@ async function loadCalculationBundle(calculationId) {
   const itemsResponse = await timeout(
     supabaseClient
       .from('leader_lead_calculation_items')
-      .select('*')
+      .select(ITEM_FIELDS)
       .eq('calculation_id', calculationId)
-      .order('sort_order', { ascending: true }),
+      .order('sort_order', { ascending: true })
+      .limit(160),
     12000,
     'Позиции расчёта не загрузились за 12 секунд'
   );
@@ -298,14 +220,14 @@ async function loadCalculationBundle(calculationId) {
 
   let lead = v4State.currentLead;
   if (!lead || lead.id !== calculation.lead_id) {
-    const leadResponse = await supabaseClient.from('leader_leads').select('*').eq('id', calculation.lead_id).single();
+    const leadResponse = await supabaseClient.from('leader_leads').select(LEAD_FIELDS).eq('id', calculation.lead_id).single();
     if (leadResponse.error) throw leadResponse.error;
     lead = leadResponse.data;
   }
 
   let need = null;
   if (calculation.need_id) {
-    const needResponse = await supabaseClient.from('leader_lead_needs').select('*').eq('id', calculation.need_id).maybeSingle();
+    const needResponse = await supabaseClient.from('leader_lead_needs').select(NEED_FIELDS).eq('id', calculation.need_id).maybeSingle();
     if (needResponse.error) throw needResponse.error;
     need = needResponse.data || null;
   }
@@ -333,10 +255,7 @@ async function writeOfferEvent({ offerId, leadId, calculationId, eventType, newS
 async function createOffer() {
   if (createBusy) return;
   const calculationId = byId('offerCalculationId')?.value || '';
-  if (!calculationId) {
-    toast('Выберите сохранённый расчёт');
-    return;
-  }
+  if (!calculationId) { toast('Выберите сохранённый расчёт'); return; }
   createBusy = true;
   const button = byId('createOfferBtn');
   if (button) button.disabled = true;
@@ -369,7 +288,7 @@ async function createOffer() {
           valid_until: validUntil,
           status: 'Черновик'
         })
-        .select('*')
+        .select(OFFER_FIELDS)
         .single(),
       14000,
       'Коммерческое предложение не сохранилось за 14 секунд'
@@ -381,7 +300,7 @@ async function createOffer() {
       .from('leader_lead_calculations')
       .update({ commercial_offer_id: offer.id, status: 'КП сформировано', updated_at: new Date().toISOString() })
       .eq('id', calculation.id)
-      .select('*')
+      .select(CALC_FIELDS)
       .single();
     if (calcUpdate.error) throw calcUpdate.error;
 
@@ -425,7 +344,7 @@ async function updateOfferStatus(offerId, status) {
   if (status === 'Отклонено') patch.rejected_at = new Date().toISOString();
 
   const response = await timeout(
-    supabaseClient.from('leader_commercial_offers').update(patch).eq('id', offerId).select('*').single(),
+    supabaseClient.from('leader_commercial_offers').update(patch).eq('id', offerId).select(OFFER_FIELDS).single(),
     12000,
     'Статус КП не обновился за 12 секунд'
   );
@@ -439,7 +358,7 @@ async function updateOfferStatus(offerId, status) {
       .from('leader_lead_calculations')
       .update({ status: calculationStatus, updated_at: new Date().toISOString() })
       .eq('id', updated.calculation_id)
-      .select('*')
+      .select(CALC_FIELDS)
       .single();
     if (calcResponse.error) throw calcResponse.error;
     updatedCalculation = calcResponse.data;
@@ -469,10 +388,7 @@ async function updateOfferStatus(offerId, status) {
 
 async function copyText(text) {
   if (!text) throw new Error('Текст КП пуст');
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
+  if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return; }
   const textarea = document.createElement('textarea');
   textarea.value = text;
   textarea.style.position = 'fixed';
@@ -485,10 +401,7 @@ async function copyText(text) {
 
 function bindOfferEvents() {
   byId('leadCardSection')?.addEventListener('click', async (event) => {
-    if (event.target.closest('#createOfferBtn')) {
-      await createOffer();
-      return;
-    }
+    if (event.target.closest('#createOfferBtn')) { await createOffer(); return; }
     const actionButton = event.target.closest('button[data-action]');
     const card = actionButton?.closest('.v4-offer-card');
     const offerId = card?.dataset.id;
@@ -497,18 +410,9 @@ function bindOfferEvents() {
     if (!offer) return;
     try {
       const action = actionButton.dataset.action;
-      if (action === 'preview-offer') {
-        activeOfferId = activeOfferId === offerId ? null : offerId;
-        renderOffers();
-      }
-      if (action === 'copy-short-offer') {
-        await copyText(offer.short_text || '');
-        toast('Короткое КП скопировано');
-      }
-      if (action === 'copy-full-offer') {
-        await copyText(offer.full_text || '');
-        toast('Подробное КП скопировано');
-      }
+      if (action === 'preview-offer') { activeOfferId = activeOfferId === offerId ? null : offerId; renderOffers(); }
+      if (action === 'copy-short-offer') { await copyText(offer.short_text || ''); toast('Короткое КП скопировано'); }
+      if (action === 'copy-full-offer') { await copyText(offer.full_text || ''); toast('Подробное КП скопировано'); }
       if (action === 'mark-offer-sent') await updateOfferStatus(offerId, 'КП отправлено');
       if (action === 'approve-offer') await updateOfferStatus(offerId, 'Согласовано');
       if (action === 'reject-offer') await updateOfferStatus(offerId, 'Отклонено');
@@ -523,15 +427,9 @@ function bindOfferEvents() {
     activeOfferId = null;
     const id = event.detail?.leadId || null;
     if (id) loadOffers(id);
-    else {
-      setState({ offers: [], offersBusy: false, offersError: null });
-      renderOffers();
-    }
+    else { setState({ offers: [], offersBusy: false, offersError: null }); renderOffers(); }
   });
-  document.addEventListener('leader-v4:crm-ready', () => {
-    if (v4State.route.leadId) loadOffers(v4State.route.leadId);
-  });
-
+  document.addEventListener('leader-v4:crm-ready', () => { if (v4State.route.leadId) loadOffers(v4State.route.leadId); });
   subscribeState((state) => {
     if (state.calculations === previousCalculations) return;
     previousCalculations = state.calculations;
