@@ -1,1 +1,1 @@
-import './offer-print-brand-v2.js?v=20260620-2';
+import './offer-print-brand-v3.js?v=20260621-logo-1';
