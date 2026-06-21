@@ -86,47 +86,6 @@ async function loadBundle(offerId) {
   return { offer, calculation, items, lead, need, canCreate: true, reason: '' };
 }
 
-function buildRows(items) {
-  return (items || []).map((item) => ({
-    catalog_id: item.catalog_id || null,
-    category: item.category || null,
-    item_type: item.item_type || 'Услуга',
-    calculation_mode: item.data?.calculation_mode || null,
-    min_client_price: item.data?.min_client_price ?? null,
-    default_client_price: item.data?.default_client_price ?? null,
-    markup_percent: item.markup_percent ?? null,
-    name: `[${item.item_type || 'Услуга'}] ${item.name || 'Позиция'}`,
-    unit: item.unit || 'шт',
-    qty: Number(item.qty || 0),
-    price: Number(item.contractor_price || 0),
-    client_sum: Number(item.client_sum || 0),
-    contractor_sum: Number(item.contractor_sum || 0),
-    comment: item.comment || '',
-    data: item.data || {}
-  }));
-}
-
-async function updateLinks(bundle, order) {
-  const now = new Date().toISOString();
-  const responses = await Promise.all([
-    supabaseClient.from('leader_lead_calculations').update({ order_id: order.id, status: 'Создан заказ', updated_at: now }).eq('id', bundle.calculation.id),
-    supabaseClient.from('leader_commercial_offers').update({ order_id: order.id, updated_at: now }).eq('id', bundle.offer.id),
-    supabaseClient.from('leader_leads').update({ status: 'Создан заказ', converted_order_id: order.id, converted_at: now, updated_at: now }).eq('id', bundle.lead.id),
-    supabaseClient.from('leader_commercial_offer_events').insert({
-      offer_id: bundle.offer.id,
-      lead_id: bundle.lead.id,
-      calculation_id: bundle.calculation.id,
-      event_type: 'Создан заказ',
-      old_status: bundle.offer.status,
-      new_status: bundle.offer.status,
-      comment: `Создан заказ ${order.order_number || order.id}`,
-      created_by: v4State.user?.id || null,
-      created_by_email: v4State.user?.email || null
-    })
-  ]);
-  return responses.filter((response) => response?.error).map((response) => response.error);
-}
-
 function renderDisabled(reason) {
   const container = host();
   if (!container || container.querySelector('#offerOrderCreateBox')) return;
@@ -144,7 +103,7 @@ function renderForm(bundle) {
     <section id="offerOrderCreateBox" class="v4-offer-order-create">
       <h3>Создать заказ из этого КП</h3>
       <p>КП согласовано, заказ ещё не создан. Проверьте параметры запуска.</p>
-      <div class="v4-offer-order-warning">После создания заказ будет связан с КП, расчётом и заявкой. Состав позиций перенесётся из расчёта.</div>
+      <div class="v4-offer-order-warning">После создания заказ будет связан с КП, расчётом и заявкой. Состав позиций перенесётся из расчёта серверной функцией.</div>
       <div class="v4-form-grid">
         <label>Название заказа
           <input id="offerOrderProjectName" value="${esc(title)}" placeholder="Например: Баннер 3×2 для клиента">
@@ -210,41 +169,32 @@ async function createOrderFromOffer(offerId) {
     if (!bundle.canCreate) throw new Error(bundle.reason || 'Заказ из этого КП сейчас создать нельзя');
     const form = formData();
     const projectName = form.projectName || orderTitleFromOffer(bundle.offer, bundle.calculation);
-    const rows = buildRows(bundle.items);
-    const clientTotal = Number(bundle.calculation.client_total || 0);
-    const contractorCost = Number(bundle.calculation.contractor_cost || 0);
-    const prepayment = Math.max(0, Number(form.prepayment || 0));
-    const totals = { cost: contractorCost, total: clientTotal, profit: Number(bundle.calculation.profit || clientTotal - contractorCost), prepayment, balance: Math.max(clientTotal - prepayment, 0) };
 
     const result = await invokeLeaderFunction('leader-crm-leads', {
-      action: 'create_order',
-      lead_id: bundle.lead.id,
+      action: 'create_order_from_offer',
+      offer_id: bundle.offer.id,
       project_name: projectName,
-      client_name: bundle.lead.name || '',
-      client_phone: bundle.lead.phone || '',
-      source: bundle.lead.source || 'CRM v4',
       order_type: form.orderType,
       deadline: form.deadline || bundle.need?.deadline_date || null,
       layout_status: form.layoutStatus || (bundle.need?.need_design ? 'Нужен дизайн' : 'Макета нет'),
       comment: form.comment || bundle.calculation.public_comment || bundle.need?.description || '',
       payment_status: form.paymentStatus,
-      rows,
-      totals
+      prepayment: Math.max(0, Number(form.prepayment || 0))
     }, { timeoutMs: 35000, timeoutMessage: 'Создание заказа не завершилось за 35 секунд' });
 
     if (!result.order?.id) throw new Error('CRM не вернула созданный заказ');
     const order = result.order;
-    const linkWarnings = await updateLinks(bundle, order);
+    const now = new Date().toISOString();
 
     setState({
-      currentLead: v4State.currentLead?.id === bundle.lead.id ? { ...v4State.currentLead, status: 'Создан заказ', converted_order_id: order.id, converted_at: new Date().toISOString() } : v4State.currentLead,
+      currentLead: v4State.currentLead?.id === bundle.lead.id ? { ...v4State.currentLead, status: 'Создан заказ', converted_order_id: order.id, converted_at: now } : v4State.currentLead,
       calculations: (v4State.calculations || []).map((calc) => calc.id === bundle.calculation.id ? { ...calc, status: 'Создан заказ', order_id: order.id } : calc),
       offers: (v4State.offers || []).map((offer) => offer.id === bundle.offer.id ? { ...offer, order_id: order.id } : offer),
       leads: (v4State.leads || []).map((lead) => lead.id === bundle.lead.id ? { ...lead, status: 'Создан заказ', converted_order_id: order.id } : lead)
     });
 
-    setStatus('Заказ создан из КП', 'good');
-    toast(linkWarnings.length ? 'Заказ создан, но часть связей нужно проверить' : 'Заказ создан и связан с КП');
+    setStatus(result.already_created ? 'Заказ уже был создан и связан с КП' : 'Заказ создан из КП', 'good');
+    toast(result.link_errors?.length ? 'Заказ создан, но часть связей нужно проверить' : 'Заказ создан и связан с КП');
     window.LeaderV4CurrentOrderId = order.id;
     document.dispatchEvent(new CustomEvent('leader-v4-order-updated', { detail: { order } }));
     document.dispatchEvent(new CustomEvent('leader-v4:lead-card-rendered', { detail: { leadId: bundle.lead.id } }));
