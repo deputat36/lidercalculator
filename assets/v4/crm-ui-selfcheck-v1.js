@@ -3,7 +3,7 @@ function esc(value) {
 }
 
 function check() {
-  const tabs = ['management_dashboard', 'workdesk', 'leads', 'orders', 'order_control', 'finance_control', 'production', 'production_control', 'offers', 'catalog'];
+  const tabs = ['management_dashboard', 'workdesk', 'leads', 'public_lead_audit', 'orders', 'order_control', 'finance_control', 'production', 'production_control', 'offers', 'catalog'];
   return tabs.map((key) => ({ key, ok: Boolean(document.querySelector(`[data-v4-tab-button="${key}"]`)) }));
 }
 
