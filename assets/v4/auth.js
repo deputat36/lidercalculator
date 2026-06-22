@@ -1,6 +1,7 @@
 import { V4_CONFIG } from './config.js';
 import { supabaseClient } from './supabase-client.js';
 import { timeout, friendlyError, isNetworkError } from './api.js';
+import { invokeLeaderFunction } from './functions-client.js';
 import { setState, resetAuthState, v4State } from './state.js';
 import { bindAuthUi, readCredentials, renderProfile, setAuthBusy, setProfileNotice, setStatus, showLoggedIn, showLoggedOut, toast } from './ui.js';
 
@@ -22,14 +23,14 @@ async function loadProfileInBackground(user) {
       return;
     }
 
-    const ensured = await supabaseClient.rpc('leader_ensure_profile', { user_email: user.email || '' }, {
+    const ensured = await invokeLeaderFunction('leader-crm-leads', { action: 'ensure_profile' }, {
       timeoutMs: Math.max(V4_CONFIG.timeouts.profileMs + 7000, 12000),
       timeoutMessage: 'Профиль доступа не подготовился вовремя'
     });
-    if (ensured.error) throw ensured.error;
-    if (ensured.data && typeof ensured.data === 'object') {
-      setState({ profile: ensured.data, profileLoaded: true });
-      renderProfile(ensured.data);
+    const profile = ensured.profile || ensured.data || ensured;
+    if (profile && typeof profile === 'object') {
+      setState({ profile, profileLoaded: true });
+      renderProfile(profile);
       setProfileNotice('');
       return;
     }
