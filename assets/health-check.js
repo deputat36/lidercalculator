@@ -83,13 +83,6 @@
     if(res.error) return {status:'ERR', details:res.error.message};
     return {status:'OK', details:'доступ есть'};
   }
-  async function checkRpc(fn){
-    var client=db();
-    if(!client) return {status:'ERR', details:'Supabase client не создан'};
-    var res=await client.rpc(fn);
-    if(res.error) return {status:'ERR', details:res.error.message};
-    return {status:'OK', details:'доступ есть'};
-  }
   window.LeaderHealthCheck={
     async run(){
       var out=[];
@@ -131,8 +124,8 @@
             }
             var sv=await checkView('leader_production_safe_summary');
             out.push(row('View leader_production_safe_summary', sv.status, sv.details));
-            var lr=await checkRpc('leader_get_leads_for_crm');
-            out.push(row('RPC leader_get_leads_for_crm', lr.status, lr.details));
+            var lr=await checkTable('leader_leads');
+            out.push(row('RLS leader_leads', lr.status, lr.details));
           }
         }
         body.innerHTML=out.join('');
