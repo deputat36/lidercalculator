@@ -172,6 +172,8 @@ export async function logout() {
       V4_CONFIG.timeouts.logoutMs,
       'Выход не ответил вовремя'
     );
+  } catch (error) {
+    console.warn('CRM v4 logout warning:', error);
   } finally {
     removeStoredSession();
     resetAuthState();
