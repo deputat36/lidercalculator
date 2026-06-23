@@ -5,6 +5,35 @@ import { invokeLeaderFunction } from './functions-client.js';
 import { setState, resetAuthState, v4State } from './state.js';
 import { bindAuthUi, readCredentials, renderProfile, setAuthBusy, setProfileNotice, setStatus, showLoggedIn, showLoggedOut, toast } from './ui.js';
 
+function isInvalidStoredSession(error) {
+  const details = `${error?.code || ''} ${error?.message || ''}`.toLowerCase();
+  return details.includes('refresh_token_not_found')
+    || details.includes('invalid refresh token')
+    || details.includes('refresh token not found');
+}
+
+function removeStoredSession() {
+  try {
+    window.localStorage.removeItem(V4_CONFIG.authStorageKey);
+  } catch (error) {
+    console.warn('CRM v4 local session storage warning:', error);
+  }
+}
+
+async function clearLocalSession() {
+  try {
+    await timeout(
+      supabaseClient.auth.signOut({ scope: 'local' }),
+      V4_CONFIG.timeouts.logoutMs,
+      'Локальный сброс сессии не ответил вовремя'
+    );
+  } catch (error) {
+    console.warn('CRM v4 local session cleanup warning:', error);
+  } finally {
+    removeStoredSession();
+  }
+}
+
 async function loadProfileInBackground(user) {
   if (!user?.id) return;
   const hadProfile = Boolean(v4State.profileLoaded && v4State.profile);
@@ -86,9 +115,15 @@ export async function checkAuth() {
     openCrm(data.session, 'CRM готова');
     return true;
   } catch (error) {
+    const staleSession = isInvalidStoredSession(error);
+    if (staleSession) await clearLocalSession();
     resetAuthState();
     showLoggedOut();
-    setStatus(isNetworkError(error) ? 'Ошибка сети' : 'Нужен вход', isNetworkError(error) ? 'error' : 'warn');
+    const message = staleSession
+      ? 'Сессия устарела. Войдите снова'
+      : (isNetworkError(error) ? 'Ошибка сети' : 'Нужен вход');
+    setStatus(message, isNetworkError(error) ? 'error' : 'warn');
+    if (staleSession) toast(message);
     return false;
   }
 }
@@ -132,8 +167,13 @@ export async function logout() {
   setAuthBusy(true);
   setStatus('Выход из CRM...', 'warn');
   try {
-    await timeout(supabaseClient.auth.signOut(), 12000, 'Выход не ответил вовремя');
+    await timeout(
+      supabaseClient.auth.signOut({ scope: 'local' }),
+      V4_CONFIG.timeouts.logoutMs,
+      'Выход не ответил вовремя'
+    );
   } finally {
+    removeStoredSession();
     resetAuthState();
     showLoggedOut();
     renderProfile(null);
