@@ -16,9 +16,22 @@ jobs:
       - name: Check CRM v4 loader chain
         run: |
           set -euo pipefail
-          grep -F 'assets/v4/site-cache-note-v1.js?v=20260623-1' app-v4.html
+          grep -F 'assets/v4/site-cache-note-v1.js?v=20260623-2' app-v4.html
           grep -F "public-lead-audit-v1.js?v=20260623-1" assets/v4/site-cache-note-v1.js
-          grep -F "crm-ui-selfcheck-v1.js?v=20260622-2" assets/v4/site-cache-note-v1.js
+          grep -F "crm-ui-selfcheck-v1.js?v=20260623-2" assets/v4/site-cache-note-v1.js
+
+      - name: Check CRM v4 tester self-check
+        run: |
+          set -euo pipefail
+          grep -F 'Проверка загруженных разделов и доступа CRM' assets/v4/crm-ui-selfcheck-v1.js
+          grep -F 'ACCESS_ROLES' assets/v4/crm-ui-selfcheck-v1.js
+          grep -F 'public_lead_audit' assets/v4/crm-ui-selfcheck-v1.js
+          grep -F 'CRM_TEST_ISSUE_URL' assets/v4/crm-ui-selfcheck-v1.js
+          grep -F 'crm-v4-browser-test.md' assets/v4/crm-ui-selfcheck-v1.js
+          grep -F 'Создать GitHub issue CRM v4 browser test' assets/v4/crm-ui-selfcheck-v1.js
+          grep -F 'Есть ошибка' assets/v4/crm-ui-selfcheck-v1.js
+          grep -F 'нет кнопки' assets/v4/crm-ui-selfcheck-v1.js
+          grep -F 'дублей:' assets/v4/crm-ui-selfcheck-v1.js
 
       - name: Check public lead audit diagnostics
         run: |
