@@ -1,0 +1,29 @@
+name: Static checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  crm-v4:
+    name: CRM v4 static checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check CRM v4 loader chain
+        run: |
+          set -euo pipefail
+          grep -F 'assets/v4/site-cache-note-v1.js?v=20260623-1' app-v4.html
+          grep -F "public-lead-audit-v1.js?v=20260623-1" assets/v4/site-cache-note-v1.js
+          grep -F "crm-ui-selfcheck-v1.js?v=20260622-2" assets/v4/site-cache-note-v1.js
+
+      - name: Check public lead audit diagnostics
+        run: |
+          set -euo pipefail
+          grep -F 'payloadText' assets/v4/public-lead-audit-v1.js
+          grep -F 'Referer:' assets/v4/public-lead-audit-v1.js
+          grep -F 'v4-audit-payload' assets/v4/public-lead-audit-v1.js
+          grep -F 'Технические данные' assets/v4/public-lead-audit-v1.js
