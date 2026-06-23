@@ -1,0 +1,37 @@
+name: CRM auth checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/v4/auth.js'
+      - 'assets/v4/config.js'
+      - '.github/workflows/crm-auth-checks.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'assets/v4/auth.js'
+      - 'assets/v4/config.js'
+      - '.github/workflows/crm-auth-checks.yml'
+
+jobs:
+  validate-crm-auth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check local session recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth='assets/v4/auth.js'
+          config='assets/v4/config.js'
+          test -f "$auth"
+          test -f "$config"
+          grep -Fq "refresh_token_not_found" "$auth"
+          grep -Fq "signOut({ scope: 'local' })" "$auth"
+          grep -Fq 'localStorage.removeItem(V4_CONFIG.authStorageKey)' "$auth"
+          grep -Fq "authStorageKey: 'leader_crm_v4_session'" "$config"
+          if grep -Fq 'supabaseClient.auth.signOut()' "$auth"; then
+            echo 'Bare signOut() would revoke sessions beyond the current browser.' >&2
+            exit 1
+          fi
