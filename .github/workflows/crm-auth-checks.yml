@@ -4,12 +4,14 @@ on:
   push:
     branches: [main]
     paths:
+      - 'app-v4.html'
       - 'assets/v4/auth.js'
       - 'assets/v4/config.js'
       - '.github/workflows/crm-auth-checks.yml'
   pull_request:
     branches: [main]
     paths:
+      - 'app-v4.html'
       - 'assets/v4/auth.js'
       - 'assets/v4/config.js'
       - '.github/workflows/crm-auth-checks.yml'
@@ -23,14 +25,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          page='app-v4.html'
           auth='assets/v4/auth.js'
           config='assets/v4/config.js'
+          test -f "$page"
           test -f "$auth"
           test -f "$config"
           grep -Fq "refresh_token_not_found" "$auth"
           grep -Fq "signOut({ scope: 'local' })" "$auth"
           grep -Fq 'localStorage.removeItem(V4_CONFIG.authStorageKey)' "$auth"
+          grep -Fq 'CRM v4 logout warning:' "$auth"
           grep -Fq "authStorageKey: 'leader_crm_v4_session'" "$config"
+          grep -Fq 'assets/v4/auth.js?v=20260623-session-2' "$page"
           if grep -Fq 'supabaseClient.auth.signOut()' "$auth"; then
             echo 'Bare signOut() would revoke sessions beyond the current browser.' >&2
             exit 1
