@@ -29,7 +29,7 @@ jobs:
           grep -F 'CRM_TEST_ISSUE_URL' assets/v4/crm-ui-selfcheck-v1.js
           grep -F 'crm-v4-browser-test.md' assets/v4/crm-ui-selfcheck-v1.js
           grep -F 'Создать GitHub issue CRM v4 browser test' assets/v4/crm-ui-selfcheck-v1.js
-          grep -F 'Есть ошибка' assets/v4/crm-ui-selfcheck-v1.js
+          grep -F 'Если есть ошибка' assets/v4/crm-ui-selfcheck-v1.js
           grep -F 'нет кнопки' assets/v4/crm-ui-selfcheck-v1.js
           grep -F 'дублей:' assets/v4/crm-ui-selfcheck-v1.js
 
