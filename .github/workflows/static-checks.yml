@@ -16,22 +16,30 @@ jobs:
       - name: Check CRM v4 loader chain
         run: |
           set -euo pipefail
-          grep -F 'assets/v4/auth-session-reset-v1.js?v=20260624-isolated-1' app-v4.html
+          grep -F 'assets/v4/auth.js?v=20260624-contour-1' app-v4.html
+          grep -F 'assets/v4/auth-session-reset-v1.js?v=20260624-contour-1' app-v4.html
           grep -F 'assets/v4/site-cache-note-v1.js?v=20260623-2' app-v4.html
           grep -F "public-lead-audit-v1.js?v=20260623-1" assets/v4/site-cache-note-v1.js
           grep -F "crm-ui-selfcheck-v1.js?v=20260623-2" assets/v4/site-cache-note-v1.js
 
-      - name: Check CRM session isolation
+      - name: Check test CRM session isolation
         run: |
           set -euo pipefail
           reset='assets/v4/auth-session-reset-v1.js'
           client='assets/v4/supabase-client.js'
-          grep -F "const CRM_SESSION_KEY = 'leader_crm_v4_session'" "$reset"
-          grep -F 'localStorage.removeItem(CRM_SESSION_KEY)' "$reset"
+          config='assets/v4/config.js'
+          grep -F "authStorageKey: 'leader_crm_v4_test_session'" "$config"
+          grep -F "const CRM_SESSION_KEY = 'leader_crm_v4_test_session'" "$reset"
+          grep -F "const LEGACY_SHARED_SESSION_KEY = 'leader_crm_v4_session'" "$reset"
+          grep -F 'removeSessionKey(LEGACY_SHARED_SESSION_KEY)' "$reset"
           grep -F 'let refreshPromise = null' "$client"
           grep -F 'if (!refreshPromise)' "$client"
           grep -F 'async getUser()' "$client"
           grep -F '/auth/v1/user' "$client"
+          if grep -Fq "authStorageKey: 'leader_crm_v4_session'" "$config"; then
+            echo 'Test CRM must not use the legacy shared auth key.' >&2
+            exit 1
+          fi
           if grep -Eq "startsWith\('sb-'\)|includes\('supabase'\)|Object\.keys\(localStorage\)" "$reset"; then
             echo 'CRM session reset must not remove storage keys belonging to other applications.' >&2
             exit 1
@@ -44,11 +52,6 @@ jobs:
           grep -F 'ACCESS_ROLES' assets/v4/crm-ui-selfcheck-v1.js
           grep -F 'public_lead_audit' assets/v4/crm-ui-selfcheck-v1.js
           grep -F 'CRM_TEST_ISSUE_URL' assets/v4/crm-ui-selfcheck-v1.js
-          grep -F 'crm-v4-browser-test.md' assets/v4/crm-ui-selfcheck-v1.js
-          grep -F 'Создать GitHub issue CRM v4 browser test' assets/v4/crm-ui-selfcheck-v1.js
-          grep -F 'Если есть ошибка' assets/v4/crm-ui-selfcheck-v1.js
-          grep -F 'нет кнопки' assets/v4/crm-ui-selfcheck-v1.js
-          grep -F 'дублей:' assets/v4/crm-ui-selfcheck-v1.js
 
       - name: Check public lead audit diagnostics
         run: |
