@@ -1,11 +1,8 @@
-const SESSION_KEYS = ['leader_crm_v4_session'];
+const CRM_SESSION_KEY = 'leader_crm_v4_session';
 
-function clearKnownSessionKeys() {
+function clearCrmSessionKey() {
   try {
-    SESSION_KEYS.forEach((key) => localStorage.removeItem(key));
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith('sb-') || key.includes('supabase')) localStorage.removeItem(key);
-    });
+    localStorage.removeItem(CRM_SESSION_KEY);
   } catch (error) {
     console.warn('CRM v4 session cleanup warning:', error);
   }
@@ -14,8 +11,8 @@ function clearKnownSessionKeys() {
 document.addEventListener('click', (event) => {
   const button = event.target.closest?.('#logoutBtn');
   if (!button) return;
-  setTimeout(clearKnownSessionKeys, 600);
-  setTimeout(clearKnownSessionKeys, 1800);
+  setTimeout(clearCrmSessionKey, 600);
+  setTimeout(clearCrmSessionKey, 1800);
 });
 
-window.LeaderV4ClearAuthSession = clearKnownSessionKeys;
+window.LeaderV4ClearAuthSession = clearCrmSessionKey;
