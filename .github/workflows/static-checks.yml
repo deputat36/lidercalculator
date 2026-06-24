@@ -16,9 +16,26 @@ jobs:
       - name: Check CRM v4 loader chain
         run: |
           set -euo pipefail
+          grep -F 'assets/v4/auth-session-reset-v1.js?v=20260624-isolated-1' app-v4.html
           grep -F 'assets/v4/site-cache-note-v1.js?v=20260623-2' app-v4.html
           grep -F "public-lead-audit-v1.js?v=20260623-1" assets/v4/site-cache-note-v1.js
           grep -F "crm-ui-selfcheck-v1.js?v=20260623-2" assets/v4/site-cache-note-v1.js
+
+      - name: Check CRM session isolation
+        run: |
+          set -euo pipefail
+          reset='assets/v4/auth-session-reset-v1.js'
+          client='assets/v4/supabase-client.js'
+          grep -F "const CRM_SESSION_KEY = 'leader_crm_v4_session'" "$reset"
+          grep -F 'localStorage.removeItem(CRM_SESSION_KEY)' "$reset"
+          grep -F 'let refreshPromise = null' "$client"
+          grep -F 'if (!refreshPromise)' "$client"
+          grep -F 'async getUser()' "$client"
+          grep -F '/auth/v1/user' "$client"
+          if grep -Eq "startsWith\('sb-'\)|includes\('supabase'\)|Object\.keys\(localStorage\)" "$reset"; then
+            echo 'CRM session reset must not remove storage keys belonging to other applications.' >&2
+            exit 1
+          fi
 
       - name: Check CRM v4 tester self-check
         run: |
