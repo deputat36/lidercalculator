@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check local session recovery
+      - name: Check isolated test CRM session recovery
         shell: bash
         run: |
           set -euo pipefail
@@ -43,15 +43,20 @@ jobs:
           grep -Fq "signOut({ scope: 'local' })" "$auth"
           grep -Fq 'localStorage.removeItem(V4_CONFIG.authStorageKey)' "$auth"
           grep -Fq 'CRM v4 logout warning:' "$auth"
-          grep -Fq "authStorageKey: 'leader_crm_v4_session'" "$config"
-          grep -Fq "const CRM_SESSION_KEY = 'leader_crm_v4_session'" "$reset"
-          grep -Fq 'localStorage.removeItem(CRM_SESSION_KEY)' "$reset"
+          grep -Fq "authStorageKey: 'leader_crm_v4_test_session'" "$config"
+          grep -Fq "const CRM_SESSION_KEY = 'leader_crm_v4_test_session'" "$reset"
+          grep -Fq "const LEGACY_SHARED_SESSION_KEY = 'leader_crm_v4_session'" "$reset"
+          grep -Fq 'removeSessionKey(LEGACY_SHARED_SESSION_KEY)' "$reset"
           grep -Fq 'let refreshPromise = null' "$client"
           grep -Fq 'if (!refreshPromise)' "$client"
           grep -Fq 'async getUser()' "$client"
           grep -Fq '/auth/v1/user' "$client"
-          grep -Fq 'assets/v4/auth.js?v=20260623-session-2' "$page"
-          grep -Fq 'assets/v4/auth-session-reset-v1.js?v=20260624-isolated-1' "$page"
+          grep -Fq 'assets/v4/auth.js?v=20260624-contour-1' "$page"
+          grep -Fq 'assets/v4/auth-session-reset-v1.js?v=20260624-contour-1' "$page"
+          if grep -Fq "authStorageKey: 'leader_crm_v4_session'" "$config"; then
+            echo 'Main and test CRM must not share an auth storage key.' >&2
+            exit 1
+          fi
           if grep -Fq 'supabaseClient.auth.signOut()' "$auth"; then
             echo 'Bare signOut() would revoke sessions beyond the current browser.' >&2
             exit 1
