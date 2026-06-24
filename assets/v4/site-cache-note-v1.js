@@ -11,7 +11,7 @@ function bootSiteCacheNote() {
     localStorage.setItem(key, '1');
     setTimeout(() => { note.style.display = 'none'; }, 9000);
   }
-  import('./crm-ui-selfcheck-v1.js?v=20260623-2').catch(() => {});
+  import('./crm-ui-selfcheck-v1.js?v=20260624-contour-1').catch(() => {});
   import('./public-lead-audit-v1.js?v=20260623-1').catch(() => {});
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootSiteCacheNote); else bootSiteCacheNote();
