@@ -51,6 +51,7 @@ jobs:
           grep -Fq 'async getUser()' "$client"
           grep -Fq '/auth/v1/user' "$client"
           grep -Fq 'assets/v4/auth.js?v=20260623-session-2' "$page"
+          grep -Fq 'assets/v4/auth-session-reset-v1.js?v=20260624-isolated-1' "$page"
           if grep -Fq 'supabaseClient.auth.signOut()' "$auth"; then
             echo 'Bare signOut() would revoke sessions beyond the current browser.' >&2
             exit 1
