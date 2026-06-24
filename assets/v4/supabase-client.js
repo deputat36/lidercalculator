@@ -6,6 +6,8 @@ const baseHeaders = Object.freeze({
   'Content-Type': 'application/json'
 });
 
+let refreshPromise = null;
+
 function storage() {
   return window.localStorage;
 }
@@ -40,8 +42,7 @@ function clearSession() {
   storage().removeItem(V4_CONFIG.authStorageKey);
 }
 
-async function refreshSession(session) {
-  if (!session?.refresh_token) return null;
+async function requestSessionRefresh(session) {
   const { data } = await fetchJson(
     `${V4_CONFIG.supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
     { method: 'POST', headers: baseHeaders, body: JSON.stringify({ refresh_token: session.refresh_token }) },
@@ -49,8 +50,19 @@ async function refreshSession(session) {
     'Проверка входа не ответила вовремя'
   );
   const refreshed = normalizeSession(data);
+  if (!refreshed?.access_token) throw new Error('Supabase не вернул обновлённую сессию');
   saveSession(refreshed);
   return refreshed;
+}
+
+async function refreshSession(session) {
+  if (!session?.refresh_token) return null;
+  if (!refreshPromise) {
+    refreshPromise = requestSessionRefresh(session).finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
 }
 
 async function currentSession() {
@@ -217,6 +229,21 @@ export const supabaseClient = {
     async getSession() {
       const session = await timeout(currentSession(), V4_CONFIG.timeouts.sessionMs, 'Проверка входа не ответила вовремя');
       return { data: { session }, error: null };
+    },
+    async getUser() {
+      try {
+        const session = await timeout(currentSession(), V4_CONFIG.timeouts.sessionMs, 'Проверка входа не ответила вовремя');
+        if (!session?.access_token) return { data: { user: null }, error: null };
+        const { data } = await fetchJson(
+          `${V4_CONFIG.supabaseUrl}/auth/v1/user`,
+          { method: 'GET', headers: { ...baseHeaders, Authorization: `Bearer ${session.access_token}` } },
+          V4_CONFIG.timeouts.sessionMs,
+          'Пользователь не получен вовремя'
+        );
+        return { data: { user: data || null }, error: null };
+      } catch (error) {
+        return { data: { user: null }, error };
+      }
     },
     async signInWithPassword(credentials) {
       try {
