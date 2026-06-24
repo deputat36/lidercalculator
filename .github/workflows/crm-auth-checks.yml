@@ -6,14 +6,18 @@ on:
     paths:
       - 'app-v4.html'
       - 'assets/v4/auth.js'
+      - 'assets/v4/auth-session-reset-v1.js'
       - 'assets/v4/config.js'
+      - 'assets/v4/supabase-client.js'
       - '.github/workflows/crm-auth-checks.yml'
   pull_request:
     branches: [main]
     paths:
       - 'app-v4.html'
       - 'assets/v4/auth.js'
+      - 'assets/v4/auth-session-reset-v1.js'
       - 'assets/v4/config.js'
+      - 'assets/v4/supabase-client.js'
       - '.github/workflows/crm-auth-checks.yml'
 
 jobs:
@@ -27,17 +31,31 @@ jobs:
           set -euo pipefail
           page='app-v4.html'
           auth='assets/v4/auth.js'
+          reset='assets/v4/auth-session-reset-v1.js'
+          client='assets/v4/supabase-client.js'
           config='assets/v4/config.js'
           test -f "$page"
           test -f "$auth"
+          test -f "$reset"
+          test -f "$client"
           test -f "$config"
           grep -Fq "refresh_token_not_found" "$auth"
           grep -Fq "signOut({ scope: 'local' })" "$auth"
           grep -Fq 'localStorage.removeItem(V4_CONFIG.authStorageKey)' "$auth"
           grep -Fq 'CRM v4 logout warning:' "$auth"
           grep -Fq "authStorageKey: 'leader_crm_v4_session'" "$config"
+          grep -Fq "const CRM_SESSION_KEY = 'leader_crm_v4_session'" "$reset"
+          grep -Fq 'localStorage.removeItem(CRM_SESSION_KEY)' "$reset"
+          grep -Fq 'let refreshPromise = null' "$client"
+          grep -Fq 'if (!refreshPromise)' "$client"
+          grep -Fq 'async getUser()' "$client"
+          grep -Fq '/auth/v1/user' "$client"
           grep -Fq 'assets/v4/auth.js?v=20260623-session-2' "$page"
           if grep -Fq 'supabaseClient.auth.signOut()' "$auth"; then
             echo 'Bare signOut() would revoke sessions beyond the current browser.' >&2
+            exit 1
+          fi
+          if grep -Eq "startsWith\('sb-'\)|includes\('supabase'\)|Object\.keys\(localStorage\)" "$reset"; then
+            echo 'CRM fallback cleanup must not delete sessions belonging to other applications.' >&2
             exit 1
           fi
