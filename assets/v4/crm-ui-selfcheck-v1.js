@@ -1,3 +1,5 @@
+import { V4_CONFIG } from './config.js';
+
 const EXPECTED_TABS = [
   { key: 'leads', label: 'Заявки' },
   { key: 'public_lead_audit', label: 'Аудит заявок' },
@@ -11,6 +13,8 @@ const EXPECTED_TABS = [
 ];
 
 const ACCESS_ROLES = ['owner', 'admin', 'manager'];
+const EXPECTED_STORAGE_KEY = 'leader_crm_v4_test_session';
+const LEGACY_STORAGE_KEY = 'leader_crm_v4_session';
 const CRM_TEST_ISSUE_URL = 'https://github.com/deputat36/lider-bsk/issues/new?template=crm-v4-browser-test.md';
 
 function esc(value) {
@@ -25,14 +29,30 @@ function row(label, message, ok = true) {
   return { label, message, ok };
 }
 
+function storageHas(key) {
+  try {
+    return window.localStorage.getItem(key) !== null;
+  } catch (_) {
+    return false;
+  }
+}
+
+function checkSessionIsolation() {
+  const keyOk = V4_CONFIG.authStorageKey === EXPECTED_STORAGE_KEY;
+  const sessionStored = storageHas(EXPECTED_STORAGE_KEY);
+  const legacyStored = storageHas(LEGACY_STORAGE_KEY);
+  return [
+    row('Контур', 'Временный тестовый', true),
+    row('Ключ сессии', V4_CONFIG.authStorageKey, keyOk),
+    row('Сессия контура', sessionStored ? 'сохранена' : 'не найдена', sessionStored),
+    row('Старый общий ключ', legacyStored ? 'обнаружен' : 'очищен', !legacyStored)
+  ];
+}
+
 function checkTabs() {
   return EXPECTED_TABS.map((item) => {
     const buttons = Array.from(document.querySelectorAll(`[data-v4-tab-button="${item.key}"]`));
-    return row(
-      item.label,
-      buttons.length === 1 ? 'OK' : buttons.length === 0 ? 'нет кнопки' : `дублей: ${buttons.length}`,
-      buttons.length === 1
-    );
+    return row(item.label, buttons.length === 1 ? 'OK' : buttons.length === 0 ? 'нет кнопки' : `дублей: ${buttons.length}`, buttons.length === 1);
   });
 }
 
@@ -42,15 +62,11 @@ function checkAccess() {
   const role = text('#profileRole') || '—';
   const active = text('#profileActive') || '—';
   const tab = document.body?.dataset?.v4Tab || '—';
-  const roleOk = ACCESS_ROLES.includes(role);
-  const activeOk = active === 'Активен';
-  const emailOk = email !== '—' && email.includes('@');
-
   return [
     row('Статус входа', authStatus, !/ошибка|нужен вход/i.test(authStatus)),
-    row('Email', email, emailOk),
-    row('Роль', role, roleOk),
-    row('Профиль', active, activeOk),
+    row('Email', email, email !== '—' && email.includes('@')),
+    row('Роль', role, ACCESS_ROLES.includes(role)),
+    row('Профиль', active, active === 'Активен'),
     row('Текущий раздел', tab, tab !== '—'),
     row('URL', window.location.href, true)
   ];
@@ -79,6 +95,7 @@ function refresh() {
   const result = document.getElementById('crmUiSelfcheckV1Result');
   if (!result) return;
   result.innerHTML = [
+    renderRows('Контур и сессия', checkSessionIsolation()),
     renderRows('Доступ', checkAccess()),
     renderRows('Разделы', checkTabs()),
     renderIssueLink()
