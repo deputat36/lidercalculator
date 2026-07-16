@@ -5,7 +5,7 @@ import { v4State, setState } from './state.js';
 import { setStatus, toast } from './ui.js';
 
 const OFFER_FIELDS = 'id,lead_id,calculation_id,client_id,order_id,offer_number,offer_type,title,total_sum,status,created_at,updated_at';
-const CALC_FIELDS = 'id,lead_id,need_id,client_id,title,status,client_total,contractor_cost,profit,margin_percent,warning_level,public_comment,internal_comment,commercial_offer_id,order_id,created_at,updated_at';
+const CALC_FIELDS = 'id,lead_id,need_id,client_id,title,status,version_number,revision_root_id,revised_from_id,is_current_revision,client_total,contractor_cost,profit,margin_percent,warning_level,public_comment,internal_comment,commercial_offer_id,order_id,created_at,updated_at';
 const ITEM_FIELDS = 'id,calculation_id,lead_id,catalog_id,category,item_type,name,unit,qty,contractor_price,contractor_sum,markup_percent,client_price,client_sum,profit,margin_percent,comment,data,sort_order';
 const LEAD_FIELDS = 'id,name,phone,source,status,converted_order_id,converted_client_id,converted_at,created_at,updated_at';
 const NEED_FIELDS = 'id,lead_id,client_id,need_type,title,description,structured_data,need_design,need_installation,deadline_date,status';
@@ -49,14 +49,16 @@ async function loadBundle(offerId) {
   const offerResponse = await supabaseClient.from('leader_commercial_offers').select(OFFER_FIELDS).eq('id', offerId).single();
   if (offerResponse.error || !offerResponse.data) throw offerResponse.error || new Error('КП не найдено');
   const offer = offerResponse.data;
-  if (offer.status !== 'Согласовано') return { offer, canCreate: false, reason: 'Заказ можно создать только из согласованного КП.' };
   if (offer.order_id) return { offer, canCreate: false, reason: 'По этому КП заказ уже создан.' };
+  if (offer.status === 'Устарело') return { offer, canCreate: false, reason: 'Это КП устарело после пересчёта. Создайте и согласуйте новое КП из актуальной версии расчёта.' };
+  if (offer.status !== 'Согласовано') return { offer, canCreate: false, reason: 'Заказ можно создать только из согласованного КП.' };
   if (!offer.calculation_id) return { offer, canCreate: false, reason: 'У КП нет связанного расчёта.' };
 
   const calcResponse = await supabaseClient.from('leader_lead_calculations').select(CALC_FIELDS).eq('id', offer.calculation_id).single();
   if (calcResponse.error || !calcResponse.data) throw calcResponse.error || new Error('Связанный расчёт не найден');
   const calculation = calcResponse.data;
   if (calculation.order_id) return { offer, calculation, canCreate: false, reason: 'По связанному расчёту заказ уже создан.' };
+  if (calculation.is_current_revision === false) return { offer, calculation, canCreate: false, reason: `КП связано с исторической версией ${Number(calculation.version_number || 1)} расчёта. Создание заказа отключено.` };
   if (Number(calculation.client_total || 0) <= 0) return { offer, calculation, canCreate: false, reason: 'Сумма расчёта клиенту должна быть больше 0 ₽.' };
 
   const itemsResponse = await supabaseClient
@@ -102,7 +104,7 @@ function renderForm(bundle) {
   container.insertAdjacentHTML('beforeend', `
     <section id="offerOrderCreateBox" class="v4-offer-order-create">
       <h3>Создать заказ из этого КП</h3>
-      <p>КП согласовано, заказ ещё не создан. Проверьте параметры запуска.</p>
+      <p>КП согласовано по актуальной версии ${Number(bundle.calculation.version_number || 1)} расчёта. Проверьте параметры запуска.</p>
       <div class="v4-offer-order-warning">После создания заказ будет связан с КП, расчётом и заявкой. Состав позиций перенесётся из расчёта серверной функцией.</div>
       <div class="v4-form-grid">
         <label>Название заказа
@@ -193,7 +195,7 @@ async function createOrderFromOffer(offerId) {
       leads: (v4State.leads || []).map((lead) => lead.id === bundle.lead.id ? { ...lead, status: 'Создан заказ', converted_order_id: order.id } : lead)
     });
 
-    setStatus(result.already_created ? 'Заказ уже был создан и связан с КП' : 'Заказ создан из КП', 'good');
+    setStatus(result.already_created ? 'Заказ уже был создан и связан с КП' : 'Заказ создан из актуального КП', 'good');
     toast(result.link_errors?.length ? 'Заказ создан, но часть связей нужно проверить' : 'Заказ создан и связан с КП');
     window.LeaderV4CurrentOrderId = order.id;
     document.dispatchEvent(new CustomEvent('leader-v4-order-updated', { detail: { order } }));

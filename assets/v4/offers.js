@@ -118,8 +118,8 @@ function buildOfferTexts({ calculation, items, lead, need, validUntil, extraComm
 
 function statusClass(status) {
   if (status === 'Согласовано') return 'is-good';
-  if (status === 'КП отправлено') return 'is-warn';
-  if (status === 'Отклонено') return 'is-error';
+  if (status === 'КП отправлено' || status === 'Отправлено') return 'is-warn';
+  if (status === 'Отклонено' || status === 'Устарело') return 'is-error';
   return '';
 }
 
@@ -160,6 +160,11 @@ function calculationForOffer(offer) {
   return (v4State.calculations || []).find((calc) => calc.id === offer.calculation_id) || null;
 }
 
+function isOfferOutdated(offer) {
+  const calculation = calculationForOffer(offer);
+  return offer.status === 'Устарело' || calculation?.is_current_revision === false;
+}
+
 function calculationMetaForOffer(offer) {
   if (!offer.calculation_id) return '<span><b>Расчёт:</b> не привязан</span>';
   const calculation = calculationForOffer(offer);
@@ -170,12 +175,16 @@ function calculationMetaForOffer(offer) {
 
 function renderOfferCard(offer) {
   const isActive = offer.id === activeOfferId;
-  return `<article class="v4-offer-card" data-id="${esc(offer.id)}"><div><div class="v4-offer-title-row"><h4>${esc(offer.title || 'Коммерческое предложение')}</h4><span class="${statusClass(offer.status)}">${esc(offer.status || 'Черновик')}</span></div><div class="v4-offer-meta"><span><b>Сумма:</b> ${money(offer.total_sum)}</span>${calculationMetaForOffer(offer)}<span><b>Действует до:</b> ${formatDate(offer.valid_until)}</span><span><b>Создано:</b> ${formatDate(offer.created_at)}</span></div></div><div class="v4-offer-actions"><button type="button" data-action="preview-offer">${isActive ? 'Скрыть' : 'Показать'}</button><button type="button" data-action="copy-short-offer">Копировать короткое</button><button type="button" data-action="copy-full-offer">Копировать полное</button>${offer.status !== 'КП отправлено' && offer.status !== 'Согласовано' ? '<button type="button" data-action="mark-offer-sent">КП отправлено</button>' : ''}${offer.status !== 'Согласовано' ? '<button type="button" data-action="approve-offer" class="v4-primary">Согласовано</button>' : ''}${offer.status !== 'Отклонено' && offer.status !== 'Согласовано' ? '<button type="button" data-action="reject-offer">Отклонено</button>' : ''}</div>${isActive ? `<div class="v4-offer-preview"><div><h5>Подробное КП</h5><pre>${esc(offer.full_text || '')}</pre></div><div><h5>Короткое сообщение</h5><pre>${esc(offer.short_text || '')}</pre></div></div>` : ''}</article>`;
+  const outdated = isOfferOutdated(offer);
+  const displayStatus = outdated ? 'Устарело' : (offer.status || 'Черновик');
+  const activeActions = `<button type="button" data-action="copy-short-offer">Копировать короткое</button><button type="button" data-action="copy-full-offer">Копировать полное</button>${offer.status !== 'КП отправлено' && offer.status !== 'Отправлено' && offer.status !== 'Согласовано' ? '<button type="button" data-action="mark-offer-sent">КП отправлено</button>' : ''}${offer.status !== 'Согласовано' ? '<button type="button" data-action="approve-offer" class="v4-primary">Согласовано</button>' : ''}${offer.status !== 'Отклонено' && offer.status !== 'Согласовано' ? '<button type="button" data-action="reject-offer">Отклонено</button>' : ''}`;
+  const warning = outdated ? '<div class="v4-empty is-error">Это КП относится к предыдущей версии расчёта и сохранено только для истории. Отправка, согласование и создание заказа отключены.</div>' : '';
+  return `<article class="v4-offer-card${outdated ? ' is-outdated' : ''}" data-id="${esc(offer.id)}"><div><div class="v4-offer-title-row"><h4>${esc(offer.title || 'Коммерческое предложение')}</h4><span class="${statusClass(displayStatus)}">${esc(displayStatus)}</span></div><div class="v4-offer-meta"><span><b>Сумма:</b> ${money(offer.total_sum)}</span>${calculationMetaForOffer(offer)}<span><b>Действует до:</b> ${formatDate(offer.valid_until)}</span><span><b>Создано:</b> ${formatDate(offer.created_at)}</span></div></div><div class="v4-offer-actions"><button type="button" data-action="preview-offer">${isActive ? 'Скрыть' : outdated ? 'Показать историю' : 'Показать'}</button>${outdated ? '' : activeActions}</div>${warning}${isActive ? `<div class="v4-offer-preview"><div><h5>Подробное КП</h5><pre>${esc(offer.full_text || '')}</pre></div><div><h5>Короткое сообщение</h5><pre>${esc(offer.short_text || '')}</pre></div></div>` : ''}</article>`;
 }
 
 function renderCreateForm() {
   const available = currentCalculations();
-  return `<div class="v4-offer-form"><h4>Сформировать КП из актуального расчёта</h4><div class="v4-form-grid"><label>Расчёт<select id="offerCalculationId">${calculationOptions()}</select></label><label>Название КП<input id="offerTitle" placeholder="Например: КП на изготовление баннера"></label><label>Действует до<input id="offerValidUntil" type="date" value="${validUntilDefault()}"></label><label class="wide">Дополнительные условия для клиента<textarea id="offerExtraComment" rows="2" placeholder="Предоплата, доставка, сроки, особенности монтажа"></textarea></label></div><div class="v4-form-actions"><button id="createOfferBtn" type="button" class="v4-primary" ${available.length ? '' : 'disabled'}>Сформировать КП</button></div><p class="v4-muted">Для нового КП доступны только актуальные версии. Старые КП сохраняют связь с той версией расчёта, по которой они были сформированы. Себестоимость, прибыль, маржа и цены подрядчиков клиенту не показываются.</p></div>`;
+  return `<div class="v4-offer-form"><h4>Сформировать КП из актуального расчёта</h4><div class="v4-form-grid"><label>Расчёт<select id="offerCalculationId">${calculationOptions()}</select></label><label>Название КП<input id="offerTitle" placeholder="Например: КП на изготовление баннера"></label><label>Действует до<input id="offerValidUntil" type="date" value="${validUntilDefault()}"></label><label class="wide">Дополнительные условия для клиента<textarea id="offerExtraComment" rows="2" placeholder="Предоплата, доставка, сроки, особенности монтажа"></textarea></label></div><div class="v4-form-actions"><button id="createOfferBtn" type="button" class="v4-primary" ${available.length ? '' : 'disabled'}>Сформировать КП</button></div><p class="v4-muted">Для нового КП доступны только актуальные версии. После пересчёта старое КП автоматически становится историческим. Себестоимость, прибыль, маржа и цены подрядчиков клиенту не показываются.</p></div>`;
 }
 
 export function renderOffers() {
@@ -184,7 +193,7 @@ export function renderOffers() {
   if (!v4State.route.leadId) { box.innerHTML = ''; return; }
   if (v4State.offersBusy) { box.innerHTML = '<div class="v4-empty">Загружаю коммерческие предложения...</div>'; return; }
   const offers = v4State.offers || [];
-  box.innerHTML = `<section class="v4-subcard v4-offers-section"><div class="v4-subcard-head"><div><h3>Коммерческие предложения</h3><p>Новое КП формируется только из актуальной версии расчёта. При отправке, согласовании или отклонении статус заявки обновится автоматически.</p></div><span class="v4-muted">КП: ${offers.length}</span></div><div class="v4-offers-list">${v4State.offersError ? `<div class="v4-empty is-error">${esc(v4State.offersError)}</div>` : offers.length ? offers.map(renderOfferCard).join('') : '<div class="v4-empty">Коммерческих предложений пока нет.</div>'}</div>${renderCreateForm()}</section>`;
+  box.innerHTML = `<section class="v4-subcard v4-offers-section"><div class="v4-subcard-head"><div><h3>Коммерческие предложения</h3><p>Новое КП формируется только из актуальной версии расчёта. Устаревшие предложения остаются в истории без рабочих действий.</p></div><span class="v4-muted">КП: ${offers.length}</span></div><div class="v4-offers-list">${v4State.offersError ? `<div class="v4-empty is-error">${esc(v4State.offersError)}</div>` : offers.length ? offers.map(renderOfferCard).join('') : '<div class="v4-empty">Коммерческих предложений пока нет.</div>'}</div>${renderCreateForm()}</section>`;
 }
 
 export async function loadOffers(leadId = v4State.route.leadId) {
@@ -362,6 +371,7 @@ async function createOffer() {
 async function updateOfferStatus(offerId, status) {
   const current = (v4State.offers || []).find((offer) => offer.id === offerId);
   if (!current) return;
+  if (isOfferOutdated(current)) throw new Error('Устаревшее КП нельзя отправить или согласовать. Сформируйте новое КП из актуального расчёта.');
   const patch = { status, updated_at: new Date().toISOString() };
   if (status === 'КП отправлено') patch.sent_at = new Date().toISOString();
   if (status === 'Согласовано') patch.approved_at = new Date().toISOString();
