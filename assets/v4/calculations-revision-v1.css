@@ -48,10 +48,47 @@
   margin-top: 12px;
 }
 
+.v4-saved-calc-card.is-superseded {
+  opacity: .76;
+  border-style: dashed;
+  background: #f8fafc;
+}
+
+.v4-calc-version-badge,
+.v4-calc-current-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.v4-calc-version-badge {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.v4-calc-current-badge.is-current {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.v4-calc-current-badge.is-history {
+  background: #e2e8f0;
+  color: #475569;
+}
+
 .v4-saved-calc-actions [data-revision-edit] {
   background: #2563eb;
   border-color: #2563eb;
   color: #fff;
+}
+
+.v4-saved-calc-card.is-superseded [data-revision-edit] {
+  background: #fff;
+  color: #1d4ed8;
 }
 
 @media (max-width: 700px) {
