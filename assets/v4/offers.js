@@ -4,7 +4,7 @@ import { v4State, setState, subscribeState } from './state.js';
 import { byId, setStatus, toast } from './ui.js';
 
 const OFFER_FIELDS = 'id,lead_id,calculation_id,client_id,order_id,offer_number,offer_type,title,short_text,full_text,total_sum,valid_until,status,sent_at,approved_at,rejected_at,created_by,updated_by,created_at,updated_at';
-const CALC_FIELDS = 'id,lead_id,need_id,client_id,title,status,version_number,client_total,contractor_cost,profit,margin_percent,warning_level,warnings,public_comment,internal_comment,commercial_offer_id,order_id,created_by,updated_by,created_at,updated_at';
+const CALC_FIELDS = 'id,lead_id,need_id,client_id,title,status,version_number,revision_root_id,revised_from_id,is_current_revision,client_total,contractor_cost,profit,margin_percent,warning_level,warnings,public_comment,internal_comment,commercial_offer_id,order_id,created_by,updated_by,created_at,updated_at';
 const ITEM_FIELDS = 'id,calculation_id,lead_id,catalog_id,category,item_type,name,unit,qty,contractor_price,contractor_sum,markup_percent,client_price,client_sum,profit,margin_percent,comment,data,sort_order,created_at,updated_at';
 const LEAD_FIELDS = 'id,name,phone,source,message,page_url,status,payload,created_at,updated_at,service,contact_preference,city,budget,utm_source,utm_medium,utm_campaign,utm_content,utm_term,assigned_to,converted_order_id,converted_client_id,last_contact_at,next_contact_at,converted_at,reject_reason,lead_quality,estimated_amount';
 const NEED_FIELDS = 'id,lead_id,title,need_type,description,structured_data,deadline_text,deadline_date,need_design,need_installation,status,created_at,updated_at';
@@ -32,10 +32,19 @@ function validUntilDefault() {
   return date.toISOString().slice(0, 10);
 }
 
+function currentCalculations() {
+  return (v4State.calculations || [])
+    .filter((calc) => calc.is_current_revision !== false)
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+}
+
 function calculationOptions(selected = '') {
-  const calculations = v4State.calculations || [];
-  if (!calculations.length) return '<option value="">Сначала сохраните расчёт</option>';
-  return ['<option value="">Выберите расчёт</option>', ...calculations.map((calc) => `<option value="${esc(calc.id)}" ${calc.id === selected ? 'selected' : ''}>${esc(calc.title || 'Расчёт')} — ${money(calc.client_total)}</option>`)].join('');
+  const calculations = currentCalculations();
+  if (!calculations.length) return '<option value="">Сначала сохраните актуальный расчёт</option>';
+  return [
+    '<option value="">Выберите актуальный расчёт</option>',
+    ...calculations.map((calc) => `<option value="${esc(calc.id)}" ${calc.id === selected ? 'selected' : ''}>${esc(calc.title || 'Расчёт')} · версия ${Number(calc.version_number || 1)} — ${money(calc.client_total)}</option>`)
+  ].join('');
 }
 
 function needDescription(need) {
@@ -147,13 +156,26 @@ async function updateLeadStatusFromOffer(leadId, status) {
   return response.data;
 }
 
+function calculationForOffer(offer) {
+  return (v4State.calculations || []).find((calc) => calc.id === offer.calculation_id) || null;
+}
+
+function calculationMetaForOffer(offer) {
+  if (!offer.calculation_id) return '<span><b>Расчёт:</b> не привязан</span>';
+  const calculation = calculationForOffer(offer);
+  if (!calculation) return '<span><b>Расчёт:</b> данные версии недоступны</span>';
+  const history = calculation.is_current_revision === false ? ' · историческая' : ' · актуальная';
+  return `<span><b>Расчёт:</b> версия ${Number(calculation.version_number || 1)}${history}</span>`;
+}
+
 function renderOfferCard(offer) {
   const isActive = offer.id === activeOfferId;
-  return `<article class="v4-offer-card" data-id="${esc(offer.id)}"><div><div class="v4-offer-title-row"><h4>${esc(offer.title || 'Коммерческое предложение')}</h4><span class="${statusClass(offer.status)}">${esc(offer.status || 'Черновик')}</span></div><div class="v4-offer-meta"><span><b>Сумма:</b> ${money(offer.total_sum)}</span><span><b>Действует до:</b> ${formatDate(offer.valid_until)}</span><span><b>Создано:</b> ${formatDate(offer.created_at)}</span></div></div><div class="v4-offer-actions"><button type="button" data-action="preview-offer">${isActive ? 'Скрыть' : 'Показать'}</button><button type="button" data-action="copy-short-offer">Копировать короткое</button><button type="button" data-action="copy-full-offer">Копировать полное</button>${offer.status !== 'КП отправлено' && offer.status !== 'Согласовано' ? '<button type="button" data-action="mark-offer-sent">КП отправлено</button>' : ''}${offer.status !== 'Согласовано' ? '<button type="button" data-action="approve-offer" class="v4-primary">Согласовано</button>' : ''}${offer.status !== 'Отклонено' && offer.status !== 'Согласовано' ? '<button type="button" data-action="reject-offer">Отклонено</button>' : ''}</div>${isActive ? `<div class="v4-offer-preview"><div><h5>Подробное КП</h5><pre>${esc(offer.full_text || '')}</pre></div><div><h5>Короткое сообщение</h5><pre>${esc(offer.short_text || '')}</pre></div></div>` : ''}</article>`;
+  return `<article class="v4-offer-card" data-id="${esc(offer.id)}"><div><div class="v4-offer-title-row"><h4>${esc(offer.title || 'Коммерческое предложение')}</h4><span class="${statusClass(offer.status)}">${esc(offer.status || 'Черновик')}</span></div><div class="v4-offer-meta"><span><b>Сумма:</b> ${money(offer.total_sum)}</span>${calculationMetaForOffer(offer)}<span><b>Действует до:</b> ${formatDate(offer.valid_until)}</span><span><b>Создано:</b> ${formatDate(offer.created_at)}</span></div></div><div class="v4-offer-actions"><button type="button" data-action="preview-offer">${isActive ? 'Скрыть' : 'Показать'}</button><button type="button" data-action="copy-short-offer">Копировать короткое</button><button type="button" data-action="copy-full-offer">Копировать полное</button>${offer.status !== 'КП отправлено' && offer.status !== 'Согласовано' ? '<button type="button" data-action="mark-offer-sent">КП отправлено</button>' : ''}${offer.status !== 'Согласовано' ? '<button type="button" data-action="approve-offer" class="v4-primary">Согласовано</button>' : ''}${offer.status !== 'Отклонено' && offer.status !== 'Согласовано' ? '<button type="button" data-action="reject-offer">Отклонено</button>' : ''}</div>${isActive ? `<div class="v4-offer-preview"><div><h5>Подробное КП</h5><pre>${esc(offer.full_text || '')}</pre></div><div><h5>Короткое сообщение</h5><pre>${esc(offer.short_text || '')}</pre></div></div>` : ''}</article>`;
 }
 
 function renderCreateForm() {
-  return `<div class="v4-offer-form"><h4>Сформировать КП из расчёта</h4><div class="v4-form-grid"><label>Расчёт<select id="offerCalculationId">${calculationOptions()}</select></label><label>Название КП<input id="offerTitle" placeholder="Например: КП на изготовление баннера"></label><label>Действует до<input id="offerValidUntil" type="date" value="${validUntilDefault()}"></label><label class="wide">Дополнительные условия для клиента<textarea id="offerExtraComment" rows="2" placeholder="Предоплата, доставка, сроки, особенности монтажа"></textarea></label></div><div class="v4-form-actions"><button id="createOfferBtn" type="button" class="v4-primary" ${v4State.calculations.length ? '' : 'disabled'}>Сформировать КП</button></div><p class="v4-muted">В клиентском тексте не показываются себестоимость, прибыль, маржа и цены подрядчиков.</p></div>`;
+  const available = currentCalculations();
+  return `<div class="v4-offer-form"><h4>Сформировать КП из актуального расчёта</h4><div class="v4-form-grid"><label>Расчёт<select id="offerCalculationId">${calculationOptions()}</select></label><label>Название КП<input id="offerTitle" placeholder="Например: КП на изготовление баннера"></label><label>Действует до<input id="offerValidUntil" type="date" value="${validUntilDefault()}"></label><label class="wide">Дополнительные условия для клиента<textarea id="offerExtraComment" rows="2" placeholder="Предоплата, доставка, сроки, особенности монтажа"></textarea></label></div><div class="v4-form-actions"><button id="createOfferBtn" type="button" class="v4-primary" ${available.length ? '' : 'disabled'}>Сформировать КП</button></div><p class="v4-muted">Для нового КП доступны только актуальные версии. Старые КП сохраняют связь с той версией расчёта, по которой они были сформированы. Себестоимость, прибыль, маржа и цены подрядчиков клиенту не показываются.</p></div>`;
 }
 
 export function renderOffers() {
@@ -162,7 +184,7 @@ export function renderOffers() {
   if (!v4State.route.leadId) { box.innerHTML = ''; return; }
   if (v4State.offersBusy) { box.innerHTML = '<div class="v4-empty">Загружаю коммерческие предложения...</div>'; return; }
   const offers = v4State.offers || [];
-  box.innerHTML = `<section class="v4-subcard v4-offers-section"><div class="v4-subcard-head"><div><h3>Коммерческие предложения</h3><p>КП формируется только из сохранённого расчёта. При отправке, согласовании или отклонении статус заявки обновится автоматически.</p></div><span class="v4-muted">КП: ${offers.length}</span></div><div class="v4-offers-list">${v4State.offersError ? `<div class="v4-empty is-error">${esc(v4State.offersError)}</div>` : offers.length ? offers.map(renderOfferCard).join('') : '<div class="v4-empty">Коммерческих предложений пока нет.</div>'}</div>${renderCreateForm()}</section>`;
+  box.innerHTML = `<section class="v4-subcard v4-offers-section"><div class="v4-subcard-head"><div><h3>Коммерческие предложения</h3><p>Новое КП формируется только из актуальной версии расчёта. При отправке, согласовании или отклонении статус заявки обновится автоматически.</p></div><span class="v4-muted">КП: ${offers.length}</span></div><div class="v4-offers-list">${v4State.offersError ? `<div class="v4-empty is-error">${esc(v4State.offersError)}</div>` : offers.length ? offers.map(renderOfferCard).join('') : '<div class="v4-empty">Коммерческих предложений пока нет.</div>'}</div>${renderCreateForm()}</section>`;
 }
 
 export async function loadOffers(leadId = v4State.route.leadId) {
@@ -255,7 +277,7 @@ async function writeOfferEvent({ offerId, leadId, calculationId, eventType, newS
 async function createOffer() {
   if (createBusy) return;
   const calculationId = byId('offerCalculationId')?.value || '';
-  if (!calculationId) { toast('Выберите сохранённый расчёт'); return; }
+  if (!calculationId) { toast('Выберите актуальный сохранённый расчёт'); return; }
   createBusy = true;
   const button = byId('createOfferBtn');
   if (button) button.disabled = true;
@@ -264,6 +286,8 @@ async function createOffer() {
     const bundle = await loadCalculationBundle(calculationId);
     const calculation = bundle.calculation;
     const visibleItems = publicItems(bundle.items);
+    if (calculation.is_current_revision === false) throw new Error('Выбрана историческая версия расчёта. Для нового КП используйте актуальную версию.');
+    if (calculation.lead_id !== v4State.route.leadId) throw new Error('Выбранный расчёт относится к другой заявке');
     if (Number(calculation.client_total || 0) <= 0) throw new Error('Сумма клиенту должна быть больше 0 ₽');
     if (!visibleItems.length) throw new Error('В расчёте нет позиций с клиентской стоимостью');
 
@@ -312,7 +336,7 @@ async function createOffer() {
       calculationId: calculation.id,
       eventType: 'Создано КП',
       newStatus: 'Черновик',
-      comment: 'КП сформировано из сохранённого расчёта'
+      comment: `КП сформировано из актуальной версии ${Number(calculation.version_number || 1)} сохранённого расчёта`
     });
 
     activeOfferId = offer.id;
@@ -323,7 +347,7 @@ async function createOffer() {
       leads: updatedLead ? (v4State.leads || []).map((lead) => lead.id === updatedLead.id ? { ...lead, ...updatedLead } : lead) : v4State.leads
     });
     renderOffers();
-    setStatus('Коммерческое предложение сформировано. Статус заявки обновлён.', 'good');
+    setStatus(`Коммерческое предложение сформировано из версии ${Number(calculation.version_number || 1)}. Статус заявки обновлён.`, 'good');
     toast('КП сформировано');
   } catch (error) {
     setStatus(`Ошибка формирования КП: ${friendlyError(error)}`, 'error');
@@ -331,7 +355,7 @@ async function createOffer() {
   } finally {
     createBusy = false;
     const currentButton = byId('createOfferBtn');
-    if (currentButton) currentButton.disabled = !v4State.calculations.length;
+    if (currentButton) currentButton.disabled = !currentCalculations().length;
   }
 }
 

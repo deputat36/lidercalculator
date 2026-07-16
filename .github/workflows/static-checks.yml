@@ -48,6 +48,21 @@ jobs:
           grep -F 'new.revision_root_id := new.id' "$guard"
           grep -F 'security invoker' "$guard"
 
+      - name: Check current calculation offer guard
+        run: |
+          set -euo pipefail
+          node --check assets/v4/offers.js
+          grep -F "offers.js?v=20260716-current-calculation-1" assets/v4/offers-loader.js
+          grep -F 'function currentCalculations()' assets/v4/offers.js
+          grep -F 'calc.is_current_revision !== false' assets/v4/offers.js
+          grep -F 'Выбрана историческая версия расчёта' assets/v4/offers.js
+          grep -F 'Для нового КП доступны только актуальные версии' assets/v4/offers.js
+          offer_guard='supabase/migrations/20260716153000_leader_offer_current_calculation_guard.sql'
+          grep -F 'leader_guard_offer_current_calculation' "$offer_guard"
+          grep -F 'before insert or update of calculation_id, lead_id' "$offer_guard"
+          grep -F 'Новое КП можно сформировать только из актуальной версии расчёта' "$offer_guard"
+          grep -F 'security invoker' "$offer_guard"
+
       - name: Check test CRM session isolation
         run: |
           set -euo pipefail
