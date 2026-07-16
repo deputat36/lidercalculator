@@ -1,0 +1,65 @@
+.v4-calculation-revision-section {
+  border: 2px solid #2563eb;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+}
+
+.v4-calculation-revision-section.hidden {
+  display: none !important;
+}
+
+.v4-revision-main-fields {
+  margin-bottom: 14px;
+}
+
+.v4-revision-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.v4-revision-toolbar b {
+  margin-right: 4px;
+}
+
+.v4-revision-table input,
+.v4-revision-table select {
+  width: 100%;
+  min-width: 105px;
+  box-sizing: border-box;
+}
+
+.v4-revision-table input[data-revision-field="name"],
+.v4-revision-table input[data-revision-field="comment"] {
+  min-width: 210px;
+}
+
+.v4-revision-row-sum {
+  white-space: nowrap;
+  font-weight: 900;
+}
+
+.v4-revision-totals {
+  margin-top: 12px;
+}
+
+.v4-saved-calc-actions [data-revision-edit] {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+@media (max-width: 700px) {
+  .v4-revision-toolbar > * {
+    flex: 1 1 100%;
+  }
+
+  .v4-calculation-revision-section .v4-form-actions > * {
+    flex: 1 1 100%;
+  }
+}
