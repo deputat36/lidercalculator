@@ -444,6 +444,8 @@ function bind() {
 
   document.addEventListener('input', (event) => {
     if (!editor) return;
+    if (event.target.id === 'revisionTitle') { editor.title = event.target.value; return; }
+    if (event.target.id === 'revisionPublicComment') { editor.publicComment = event.target.value; return; }
     const field = event.target.closest?.('[data-revision-field]');
     if (!field) return;
     const index = Number(field.dataset.index);
@@ -454,6 +456,7 @@ function bind() {
 
   document.addEventListener('change', (event) => {
     if (!editor) return;
+    if (event.target.id === 'revisionNeedId') { editor.needId = event.target.value; return; }
     const field = event.target.closest?.('[data-revision-field]');
     if (!field) return;
     const index = Number(field.dataset.index);
