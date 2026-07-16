@@ -42,6 +42,11 @@ jobs:
           grep -F 'for update;' "$migration"
           grep -F 'security invoker' "$migration"
           grep -F 'revoke all on function public.leader_create_calculation_revision' "$migration"
+          guard='supabase/migrations/20260716151000_leader_calculation_revision_insert_guard.sql'
+          grep -F 'leader_set_calculation_revision_defaults' "$guard"
+          grep -F 'before insert on public.leader_lead_calculations' "$guard"
+          grep -F 'new.revision_root_id := new.id' "$guard"
+          grep -F 'security invoker' "$guard"
 
       - name: Check test CRM session isolation
         run: |
