@@ -17,9 +17,36 @@ jobs:
           set -euo pipefail
           grep -F 'assets/v4/auth.js?v=20260624-contour-1' app-v4.html
           grep -F 'assets/v4/auth-session-reset-v1.js?v=20260624-contour-1' app-v4.html
-          grep -F 'assets/v4/site-cache-note-v1.js?v=20260623-2' app-v4.html
+          grep -F 'assets/v4/site-cache-note-v1.js?v=20260716-2' app-v4.html
+          grep -F 'assets/v4/calculations-revision-v1.css?v=20260716-2' app-v4.html
+          grep -F 'assets/v4/calculations-revision-v1.js?v=20260716-2' app-v4.html
           grep -F "crm-ui-selfcheck-v1.js?v=20260624-contour-1" assets/v4/site-cache-note-v1.js
           grep -F "public-lead-audit-v1.js?v=20260623-1" assets/v4/site-cache-note-v1.js
+          if grep -Fq 'calculations-revision-v1.js' assets/v4/site-cache-note-v1.js; then
+            echo 'Calculation editor must be loaded directly by app-v4.html, not through the cache note.' >&2
+            exit 1
+          fi
+
+      - name: Check calculation revision workflow
+        run: |
+          set -euo pipefail
+          node --check assets/v4/calculations-revision-v1.js
+          node --check assets/v4/calculations-saved-tools-v2.js
+          grep -F 'revision_root_id' assets/v4/calculations-saved-tools-v2.js
+          grep -F 'is_current_revision' assets/v4/calculations-saved-tools-v2.js
+          grep -F 'data-revision-new' assets/v4/calculations-saved-tools-v2.js
+          grep -F 'data-revision-edit' assets/v4/calculations-saved-tools-v2.js
+          migration='supabase/migrations/20260716150000_leader_calculation_revision_lineage.sql'
+          grep -F 'leader_lead_calculations_root_version_uidx' "$migration"
+          grep -F 'leader_lead_calculations_one_current_uidx' "$migration"
+          grep -F 'for update;' "$migration"
+          grep -F 'security invoker' "$migration"
+          grep -F 'revoke all on function public.leader_create_calculation_revision' "$migration"
+          guard='supabase/migrations/20260716151000_leader_calculation_revision_insert_guard.sql'
+          grep -F 'leader_set_calculation_revision_defaults' "$guard"
+          grep -F 'before insert on public.leader_lead_calculations' "$guard"
+          grep -F 'new.revision_root_id := new.id' "$guard"
+          grep -F 'security invoker' "$guard"
 
       - name: Check test CRM session isolation
         run: |

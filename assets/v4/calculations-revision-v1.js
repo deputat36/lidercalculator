@@ -8,16 +8,6 @@ const ITEM_FIELDS = 'id,calculation_id,lead_id,catalog_id,category,item_type,nam
 let editor = null;
 let loading = false;
 let saving = false;
-let decorateTimer = null;
-
-function ensureRevisionStyles() {
-  if (document.querySelector('link[data-calculation-revision-style]')) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.dataset.calculationRevisionStyle = '1';
-  link.href = new URL('./calculations-revision-v1.css?v=20260716-1', import.meta.url).href;
-  document.head.appendChild(link);
-}
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -103,6 +93,18 @@ function calcById(id) {
   return (v4State.calculations || []).find((calc) => calc.id === id) || null;
 }
 
+function calcRoot(calc) {
+  return calc?.revision_root_id || calc?.id || null;
+}
+
+function nextVersion(source) {
+  if (!source) return 1;
+  const root = calcRoot(source);
+  return Math.max(0, ...(v4State.calculations || [])
+    .filter((calc) => calcRoot(calc) === root)
+    .map((calc) => Number(calc.version_number || 1))) + 1;
+}
+
 function needOptions(selected = '') {
   const options = [`<option value="" ${selected ? '' : 'selected'}>Общий расчёт по заявке</option>`];
   (v4State.leadNeeds || []).filter((need) => need.status !== 'Архив').forEach((need) => {
@@ -175,14 +177,15 @@ function renderEditor() {
 
   host.classList.remove('hidden');
   const source = editor.source;
+  const version = nextVersion(source);
   const sourceNote = source
-    ? `Правки сохранятся как новая версия. Исходный расчёт «${esc(source.title || 'Расчёт')}» останется без изменений${source.commercial_offer_id ? ', потому что по нему уже есть КП' : ''}${source.order_id ? ', и он связан с заказом' : ''}.`
-    : 'Создайте новый расчёт прямо в этой заявке. После сохранения он появится в списке и будет доступен для нового КП.';
+    ? `${source.is_current_revision === false ? `Вы выбрали историческую версию ${Number(source.version_number || 1)}. ` : ''}Правки сохранятся как версия ${version}. Исходный расчёт останется без изменений${source.commercial_offer_id ? ', потому что по нему уже есть КП' : ''}${source.order_id ? ', и он связан с заказом' : ''}. Новая версия станет актуальной в этой цепочке.`
+    : 'Будет создан самостоятельный расчёт версии 1 прямо в этой заявке. После сохранения его можно использовать для нового КП.';
 
   host.innerHTML = `
     <div class="v4-subcard-head">
       <div>
-        <h3>${source ? 'Внести правки в расчёт' : 'Новый расчёт'}</h3>
+        <h3>${source ? `Внести правки · версия ${Number(source.version_number || 1)} → ${version}` : 'Новый расчёт · версия 1'}</h3>
         <p>${sourceNote}</p>
       </div>
       <button type="button" data-revision-cancel>Закрыть</button>
@@ -214,43 +217,10 @@ function renderEditor() {
     </div>
     <div id="revisionTotals" class="v4-calc-totals"></div>
     <div class="v4-form-actions">
-      <button type="button" class="v4-primary" data-revision-save ${saving ? 'disabled' : ''}>${saving ? 'Сохраняю…' : 'Сохранить новой версией'}</button>
+      <button type="button" class="v4-primary" data-revision-save ${saving ? 'disabled' : ''}>${saving ? 'Сохраняю…' : source ? `Сохранить версию ${version}` : 'Сохранить новый расчёт'}</button>
       <button type="button" data-revision-cancel>Отмена</button>
     </div>`;
   renderTotals();
-}
-
-function scheduleDecorate() {
-  clearTimeout(decorateTimer);
-  decorateTimer = setTimeout(decorateSavedCalculations, 40);
-}
-
-function decorateSavedCalculations() {
-  const section = document.querySelector('.v4-saved-calc-section');
-  if (!section) return;
-
-  const headerActions = section.querySelector('.v4-subcard-head .v4-form-actions');
-  if (headerActions && !headerActions.querySelector('[data-revision-new]')) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'v4-primary';
-    button.dataset.revisionNew = '1';
-    button.textContent = 'Новый расчёт';
-    headerActions.prepend(button);
-  }
-
-  section.querySelectorAll('.v4-saved-calc-card').forEach((card) => {
-    const detailsButton = card.querySelector('[data-v2-calc-details]');
-    const actions = card.querySelector('.v4-saved-calc-actions');
-    const id = detailsButton?.dataset.v2CalcDetails;
-    if (!id || !actions || actions.querySelector('[data-revision-edit]')) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'v4-primary';
-    button.dataset.revisionEdit = id;
-    button.textContent = 'Внести правки';
-    actions.prepend(button);
-  });
 }
 
 function openBlankEditor() {
@@ -298,7 +268,7 @@ async function openRevisionEditor(id) {
     if (!editor.rows.length) editor.rows = [blankRow()];
     renderEditor();
     editorHost()?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setStatus('Расчёт открыт для правок. Исходная версия сохранится.', 'good');
+    setStatus(`Открыта версия ${Number(calc.version_number || 1)}. После сохранения исходник останется в истории.`, 'good');
   } catch (error) {
     const message = friendlyError(error);
     editor = null;
@@ -359,12 +329,12 @@ async function saveRevision() {
     const response = await supabaseClient.rpc('leader_create_calculation_revision', {
       p_lead_id: v4State.route.leadId,
       p_source_calculation_id: source?.id || null,
-      p_title: editor.title || (source ? `${source.title || 'Расчёт'} — новая версия` : 'Новый расчёт'),
+      p_title: editor.title || (source ? source.title || 'Расчёт' : 'Новый расчёт'),
       p_need_id: editor.needId || null,
       p_public_comment: editor.publicComment || null,
       p_internal_comment: source
-        ? `Новая версия расчёта ${source.version_number || 1}. Исходный расчёт: ${source.id}`
-        : 'Новый расчёт создан в редакторе заявки',
+        ? `Новая версия на основе расчёта ${source.id}; корень цепочки ${calcRoot(source)}; исходная версия ${Number(source.version_number || 1)}`
+        : 'Самостоятельный расчёт создан в редакторе заявки',
       p_items: editor.rows.map((row) => ({
         catalog_id: row.catalog_id || null,
         category: row.category || 'Ручная позиция',
@@ -385,14 +355,19 @@ async function saveRevision() {
     const saved = Array.isArray(response.data) ? response.data[0] : response.data;
     if (!saved?.id) throw new Error('Supabase не вернул сохранённый расчёт');
 
-    setState({ calculations: [saved, ...(v4State.calculations || []).filter((calc) => calc.id !== saved.id)] });
+    const savedRoot = calcRoot(saved);
+    const previous = (v4State.calculations || [])
+      .filter((calc) => calc.id !== saved.id)
+      .map((calc) => calcRoot(calc) === savedRoot ? { ...calc, is_current_revision: false } : calc);
+    setState({ calculations: [saved, ...previous] });
+
     const savedTitle = saved.title || editor.title || 'Расчёт';
+    const savedVersion = Number(saved.version_number || 1);
     editor = null;
     renderEditor();
     document.dispatchEvent(new CustomEvent('leader-v4:lead-card-rendered', { detail: { leadId: v4State.route.leadId } }));
-    setStatus(`Новая версия «${savedTitle}» сохранена. Можно сформировать новое КП.`, 'good');
-    toast('Новая версия расчёта сохранена');
-    scheduleDecorate();
+    setStatus(`«${savedTitle}», версия ${savedVersion}, сохранена как актуальная. Можно сформировать новое КП.`, 'good');
+    toast(`Сохранена версия ${savedVersion}`);
   } catch (error) {
     const message = friendlyError(error);
     editor.error = message;
@@ -406,7 +381,6 @@ async function saveRevision() {
 }
 
 function bind() {
-  ensureRevisionStyles();
   document.addEventListener('click', async (event) => {
     const edit = event.target.closest?.('[data-revision-edit]');
     if (edit) {
@@ -465,20 +439,12 @@ function bind() {
     renderTotals();
   });
 
-  document.addEventListener('leader-v4:lead-card-rendered', () => {
-    scheduleDecorate();
-    renderEditor();
-  });
+  document.addEventListener('leader-v4:lead-card-rendered', renderEditor);
   document.addEventListener('leader-v4:route-change', () => {
     editor = null;
     renderEditor();
-    scheduleDecorate();
   });
   document.addEventListener('leader-v4:needs-loaded', renderEditor);
-
-  const observer = new MutationObserver(scheduleDecorate);
-  observer.observe(document.body, { childList: true, subtree: true });
 }
 
 bind();
-scheduleDecorate();
