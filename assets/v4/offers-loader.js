@@ -1,4 +1,4 @@
-import './offers.js?v=20260716-current-calculation-1';
+import './offers.js?v=20260716-outdated-offer-1';
 import './orders.js?v=20260620-explicit-1';
 
 const styles = [
