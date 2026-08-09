@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>CRM v4 — preview PR #484</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#0f172a;background:#f8fafc}
+body{min-height:100vh;margin:0;display:grid;place-items:center}
+main{width:min(560px,calc(100% - 32px));padding:28px;border:1px solid #cbd5e1;border-radius:20px;background:#fff;box-shadow:0 20px 50px rgba(15,23,42,.12)}
+h1{margin:0 0 10px;font-size:24px;font-weight:900}p{line-height:1.55}.meta{color:#475569;font-size:14px}.error{color:#b91c1c;font-weight:700}
+</style>
+</head>
+<body>
+<main>
+<h1>Подготавливаю безопасный preview CRM</h1>
+<p id="status">Загружаю frontend PR #484…</p>
+<p class="meta">Источник закреплён на commit <code>bb50949222daaaa8ef3ac2c6d8803e8d398e670a</code>. Production CRM и Supabase не изменяются.</p>
+</main>
+<script>
+(() => {
+  const status = document.getElementById('status');
+  const target = new URL('./app/', location.href);
+  target.search = location.search || '?tab=leads';
+
+  async function openPreview() {
+    if (!('serviceWorker' in navigator)) {
+      throw new Error('Этот браузер не поддерживает изолированный preview.');
+    }
+    await navigator.serviceWorker.register('./sw.js?sha=bb50949222daaaa8ef3ac2c6d8803e8d398e670a', {
+      scope: './',
+      updateViaCache: 'none'
+    });
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) {
+      await new Promise((resolve) => {
+        const timer = setTimeout(resolve, 4000);
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          clearTimeout(timer);
+          resolve();
+        }, { once: true });
+      });
+    }
+    location.replace(target.href);
+  }
+
+  openPreview().catch((error) => {
+    status.className = 'error';
+    status.textContent = 'Preview не запустился: ' + (error && error.message ? error.message : 'неизвестная ошибка');
+  });
+})();
+</script>
+</body>
+</html>
